@@ -1,0 +1,24 @@
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# tooling
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# runtime / generated
+/tmp/
+*.log
+scenarios/*/  # generated scenario folders, but keep dir + README
+!scenarios/.gitkeep
+!scenarios/README.md
+
+# vercel / next (in case of future web)
+.vercel/
+node_modules/
+.next/
