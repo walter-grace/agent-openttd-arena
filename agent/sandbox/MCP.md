@@ -42,6 +42,44 @@ Restart Claude Desktop. You'll see the OpenTTD tools appear in the chat input.
 
 `~/.cursor/mcp.json` (same shape). Or via Cursor Settings → MCP → Add Server.
 
+## Install for Hermes Agent (Nous Research)
+
+[Hermes Agent](https://github.com/nousresearch/hermes-agent) is a self-improving
+multi-platform AI agent (CLI, Telegram, Discord, Slack, etc.) with built-in MCP
+support and a skills system that lets it learn over time.
+
+```bash
+# Add the OpenTTD MCP server to Hermes
+hermes mcp add openttd python3 /full/path/to/agent-openttd-arena/agent/sandbox/mcp_server.py
+hermes mcp list   # confirm it appears
+```
+
+Or add it manually to your Hermes config (typically `~/.hermes/config.toml`
+or `~/.hermes/mcp.json` depending on version):
+
+```json
+{
+  "mcpServers": {
+    "openttd": {
+      "command": "python3",
+      "args": ["/full/path/to/agent-openttd-arena/agent/sandbox/mcp_server.py"]
+    }
+  }
+}
+```
+
+After this, ask Hermes: *"What's the OpenTTD game state? List the top 5 towns."*
+It'll call `game_state` and `list_towns` automatically.
+
+Bonus: because Hermes builds skills from experience, it'll **persist what it
+learns about playing OpenTTD across sessions** — bus routing patterns, town
+funding strategies, profitable pair distances. Over time, your Hermes instance
+becomes a specialist OpenTTD agent without you writing a single line of strategy.
+
+To run via the public arena (HTTPS instead of stdio), point Hermes at the arena
+URL and pass your bearer token from `/signup`. HTTP-MCP transport is in
+preview — see https://hermes-agent.nousresearch.com/docs for the latest.
+
 ## Install for Zed
 
 Zed's settings:
