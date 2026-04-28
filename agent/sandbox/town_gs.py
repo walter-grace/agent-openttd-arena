@@ -58,7 +58,7 @@ def generate_town_loader(towns: List[dict],
     """
     handle = _safe_handle(scenario_name)
     short = _short_code(handle)
-    class_base = "DlfTownLoader_" + handle
+    class_base = "NutzTownLoader_" + handle
     folder = out_dir / f"nutz_town_loader_{handle}"
     folder.mkdir(parents=True, exist_ok=True)
 

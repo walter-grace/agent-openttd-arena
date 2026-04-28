@@ -48,8 +48,8 @@ def generate_bridge_with_towns(towns: List[dict],
     Nutz bridge loop forever (state push + admin command handling)."""
     handle = _safe_handle(scenario_name)
     short = _short_code(handle)
-    class_main = f"DlfBridgeWithTowns_{handle}Main"
-    class_info = f"DlfBridgeWithTowns_{handle}Info"
+    class_main = f"NutzBridgeWithTowns_{handle}Main"
+    class_info = f"NutzBridgeWithTowns_{handle}Info"
     folder = out_dir / f"nutz_bridge_{handle}"
     folder.mkdir(parents=True, exist_ok=True)
 
