@@ -48,6 +48,11 @@ try:
 except ImportError:
     from planner import plan_route  # type: ignore
 
+try:
+    from . import x402_gate
+except ImportError:
+    import x402_gate  # type: ignore
+
 
 PROTOCOL_VERSION = "2025-03-26"
 SERVER_NAME = "openttd"
@@ -185,6 +190,18 @@ TOOLS = [
 
 def call_tool(name: str, args: dict) -> dict:
     """Run a tool by name. Returns the MCP result content shape."""
+    # x402 payment gate — runs BEFORE any state mutation. Strips the bearer
+    # from args so the rest of the dispatcher never sees it. Free tools and
+    # disabled-mode short-circuit through `check_payment` returning ok=True.
+    args = dict(args or {})  # copy — we mutate
+    payment_token = args.pop("_payment_token", None)
+    gate_args = dict(args)
+    if payment_token is not None:
+        gate_args["_payment_token"] = payment_token
+    ok, err = x402_gate.check_payment(name, gate_args)
+    if not ok:
+        return _text(err)
+
     c = get_client()
     if name == "game_state":
         gs = c.get_gs_state() or {}
@@ -247,6 +264,35 @@ def _text(obj: Any) -> dict:
     return {"content": [{"type": "text", "text": json.dumps(obj, indent=2, default=str)}]}
 
 
+def _annotated_tools() -> list[dict]:
+    """Return TOOLS with x402 price hints injected into descriptions and
+    schemas, so MCP clients can discover what each tool costs and where to
+    pass the payment token. No-op when x402 is disabled."""
+    enabled = x402_gate._mode() != "disabled"
+    out: list[dict] = []
+    for tool in TOOLS:
+        t = {**tool, "inputSchema": json.loads(json.dumps(tool["inputSchema"]))}
+        name = t["name"]
+        if enabled and x402_gate.is_paid_tool(name):
+            price = x402_gate.price_usdc(name)
+            t["description"] = (
+                f"{t['description']} [x402: {price} USDC per call. Pass an "
+                f"`_payment_token` arg with a bearer token from the operator's "
+                f"create-mcpay gateway.]"
+            )
+            schema = t["inputSchema"]
+            schema.setdefault("properties", {})
+            schema["properties"]["_payment_token"] = {
+                "type": "string",
+                "description": (
+                    f"x402 bearer token (mcp_...) — required, costs "
+                    f"{price} USDC."
+                ),
+            }
+        out.append(t)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # JSON-RPC 2.0 dispatch
 # ---------------------------------------------------------------------------
@@ -264,7 +310,7 @@ def handle(req: dict) -> dict | None:
     if method == "notifications/initialized":
         return None  # notification, no response
     if method == "tools/list":
-        return _ok(rid, {"tools": TOOLS})
+        return _ok(rid, {"tools": _annotated_tools()})
     if method == "tools/call":
         try:
             result = call_tool(params["name"], params.get("arguments") or {})
@@ -290,6 +336,7 @@ def _err(rid: Any, code: int, message: str) -> dict:
 
 def main() -> int:
     sys.stderr.write(f"Nutz OpenTTD MCP server starting (protocol {PROTOCOL_VERSION})\n")
+    sys.stderr.write(f"  {x402_gate.status_summary()}\n")
     sys.stderr.flush()
     while True:
         try:

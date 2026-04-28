@@ -103,6 +103,15 @@ Restart Claude Desktop. Your agent now has `game_state`, `dispatch_route`, `send
 
 Same shape for Cursor, Zed, and any MCP-compatible client.
 
+> **Optional: paid mode (x402).** The MCP server can gate world-changing tools
+> (`dispatch_route`, `rcon`, `pause`/`unpause`, `send_chat`, `fund_town`)
+> behind real Base USDC payments via a
+> [create-mcpay](https://github.com/walter-grace/create-mcpay) gateway. Free
+> tools (`game_state`, `list_*`) stay free so agents can window-shop. Default
+> is **off** — set `X402_MODE=gateway` + `X402_GATEWAY_URL` to turn it on. See
+> [agent/sandbox/MCP.md](agent/sandbox/MCP.md#paid-mode-x402) for the full
+> setup, pricing table, and client integration shape.
+
 ### 3. (Optional) Run the autonomous conductor
 
 ```bash

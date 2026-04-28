@@ -99,6 +99,117 @@ lines, stdlib-only). The OpenTTD admin protocol is well-documented and
 stable; we re-export it through MCP semantics so any tool-using LLM can drive
 the game without learning OpenTTD's binary protocol.
 
+## Paid mode (x402)
+
+The MCP server can optionally **gate paid tool calls** behind real Base USDC
+payments via [x402](https://x402.gitbook.io). Free tools (read-only
+observation: `game_state`, `list_companies`, `list_towns`, `list_vehicles`,
+`list_stations`) are always free; tools that mutate the world or impact other
+players require a bearer token from a [`create-mcpay`](https://github.com/walter-grace/create-mcpay)
+gateway.
+
+**Default is OFF.** With no env vars set, every tool runs as before — the
+forker doesn't have to set up payments to try the kit.
+
+### Default prices (USDC per call)
+
+| Tool | Price | Reason |
+|---|---:|---|
+| `dispatch_route` | $0.05 | Most valuable action — actually changes the world |
+| `rcon` | $0.10 | Escape hatch — most expensive |
+| `pause` / `unpause` | $0.01 | Can grief other players |
+| `fund_town` | $0.005 | Advisory only — but charge to discourage abuse |
+| `send_chat` | $0.001 | Cheap but non-zero — anti-spam |
+
+Override per-tool prices with `X402_PRICES_OVERRIDE_JSON`, e.g.
+`X402_PRICES_OVERRIDE_JSON='{"send_chat": 0.005}'`.
+
+### Modes
+
+Set via `X402_MODE`:
+
+- `disabled` (default) — no payment required.
+- `gateway` — verify each paid call against a `create-mcpay` Worker. Real money.
+- `mock` — accept any token starting with `mcp_test_` and reject everything
+  else. For local end-to-end testing without a Worker.
+
+Legacy alias: `X402_ENABLED=true` is equivalent to `X402_MODE=gateway`.
+
+### Enabling real-money mode
+
+```bash
+export X402_MODE=gateway
+export X402_GATEWAY_URL=https://your-worker.workers.dev   # your create-mcpay gateway
+export X402_RECIPIENT_ADDRESS=0xYourBaseUSDCWallet        # informational
+# optional:
+export X402_TIMEOUT_S=5
+```
+
+Restart your MCP client (Claude Desktop / Cursor / Zed). On startup the server
+logs `x402: gateway mode (url=…, recipient=…)` to stderr.
+
+### How clients pay
+
+Because MCP-over-stdio has no HTTP headers, the bearer is piggybacked on the
+JSON args under the special key `_payment_token`. When x402 mode is active,
+`tools/list` advertises this in each paid tool's input schema and prefixes its
+description with `[x402: <price> USDC per call. ...]`.
+
+A paid call looks like:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "tools/call",
+  "params": {
+    "name": "dispatch_route",
+    "arguments": {
+      "from_town": "Chino",
+      "to_town": "Chino",
+      "_payment_token": "mcp_<bearer_from_create_mcpay>"
+    }
+  }
+}
+```
+
+The server strips `_payment_token` before forwarding args to the tool body —
+it never leaks into game state.
+
+If the token is missing, invalid, or rejected by the gateway, the tool returns
+a 402-shaped result instead of executing:
+
+```json
+{
+  "error": "402 Payment Required",
+  "tool": "dispatch_route",
+  "price_usdc": 0.05,
+  "price_mcents": 5000,
+  "chain": "base",
+  "currency": "USDC",
+  "recipient": "0x...",
+  "hint": "Pass a paid bearer token as `_payment_token` in the tool args. ...",
+  "free_tools": ["game_state", "list_companies", "list_stations", "list_towns", "list_vehicles"]
+}
+```
+
+### Local testing without a Worker
+
+```bash
+X402_MODE=mock python3 agent/sandbox/mcp_server.py
+```
+
+Then any `_payment_token` like `mcp_test_anything` passes; missing or
+non-`mcp_test_*` tokens return 402. Free tools always pass.
+
+Run the gate's smoke tests:
+
+```bash
+python3 agent/sandbox/test_x402_gate.py
+```
+
+(14 tests, stdlib-only, no network.)
+
 ## Limitations
 
 - Read state via the bridge_gs game script (must be loaded; comes free with
