@@ -88,7 +88,7 @@ def fetch_osm_towns(bbox: Tuple[float, float, float, float],
     # Overpass community asks for a descriptive User-Agent so they can
     # contact operators about problem traffic. Use one.
     headers = {
-        "User-Agent": "DLF-OpenTTD-Flywheel/0.1 (github.com/dlf-flywheel)",
+        "User-Agent": "agent-openttd-arena/0.1 (github.com/agent-openttd-arena)",
     }
     last_err = None
     for url in OVERPASS_ENDPOINTS:

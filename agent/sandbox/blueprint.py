@@ -4,11 +4,11 @@ Wire format is a set of OpenTTD signs. Each sign carries one fact at one
 tile; the executor reads them and builds in order. Sign text is kept under
 32 chars so legacy OpenTTD versions don't truncate.
 
-Sign grammar (all start with DLF:bp:<job>:):
-  DLF:bp:<job>:S:fr=<tile>:eg=<id>   placed at station-A tile
-  DLF:bp:<job>:E:fr=<tile>           placed at station-B tile
-  DLF:bp:<job>:W:<n>                 placed at every road-path tile in order
-  DLF:bp:<job>:D:fr=<tile>           placed at depot tile
+Sign grammar (all start with NUTZ:bp:<job>:):
+  NUTZ:bp:<job>:S:fr=<tile>:eg=<id>   placed at station-A tile
+  NUTZ:bp:<job>:E:fr=<tile>           placed at station-B tile
+  NUTZ:bp:<job>:W:<n>                 placed at every road-path tile in order
+  NUTZ:bp:<job>:D:fr=<tile>           placed at depot tile
 
 The path waypoints implicitly include the road tiles immediately adjacent
 to each station (W:0 borders S, W:N borders E). The executor builds road
@@ -74,12 +74,12 @@ class Blueprint:
         self.validate()
         j = self.job_id
         out: List[Tuple[int, str]] = [
-            (self.station_a[0], f"DLF:bp:{j}:S:fr={self.station_a[1]}:eg={self.engine}"),
-            (self.station_b[0], f"DLF:bp:{j}:E:fr={self.station_b[1]}"),
-            (self.depot[0],     f"DLF:bp:{j}:D:fr={self.depot[1]}"),
+            (self.station_a[0], f"NUTZ:bp:{j}:S:fr={self.station_a[1]}:eg={self.engine}"),
+            (self.station_b[0], f"NUTZ:bp:{j}:E:fr={self.station_b[1]}"),
+            (self.depot[0],     f"NUTZ:bp:{j}:D:fr={self.depot[1]}"),
         ]
         for n, t in enumerate(self.path):
-            out.append((t, f"DLF:bp:{j}:W:{n}"))
+            out.append((t, f"NUTZ:bp:{j}:W:{n}"))
         for tile, text in out:
             if len(text) > 31:
                 raise ValueError(f"sign text >31 chars: {text!r}")
@@ -95,12 +95,12 @@ _TAG_S, _TAG_E, _TAG_W, _TAG_D = "S", "E", "W", "D"
 
 def decode_signs(signs: List[Tuple[int, str]]) -> List[Blueprint]:
     """Parse a list of (tile, sign_text) pairs back into Blueprint(s).
-    Signs not matching DLF:bp:* are ignored. Useful in tests + executor sim."""
+    Signs not matching NUTZ:bp:* are ignored. Useful in tests + executor sim."""
     by_job: dict[int, dict] = {}
     for tile, text in signs:
-        if not text.startswith("DLF:bp:"):
+        if not text.startswith("NUTZ:bp:"):
             continue
-        rest = text[len("DLF:bp:"):]
+        rest = text[len("NUTZ:bp:"):]
         try:
             job_str, tag, *kvs = rest.split(":")
             job = int(job_str)

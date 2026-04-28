@@ -1,6 +1,6 @@
 """Heuristic Blueprint planner.
 
-Given the GS state JSON pushed by dlf_bridge and two town names, emit a
+Given the GS state JSON pushed by nutz_bridge and two town names, emit a
 candidate Blueprint that the executor can attempt to build. This is the
 *dumb* baseline: straight-line manhattan road, station offset 5 tiles
 from town center toward the partner, depot at station-A + (2,0).

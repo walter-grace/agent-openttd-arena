@@ -1,4 +1,4 @@
-"""DLF OpenTTD MCP Server — exposes the live OpenTTD admin port to any
+"""Nutz OpenTTD MCP Server — exposes the live OpenTTD admin port to any
 AI agent that speaks Model Context Protocol.
 
 Speaks MCP over stdio (the standard transport for Claude Desktop, Cursor,
@@ -120,7 +120,7 @@ TOOLS = [
                        "Same town for from + to triggers intra-town mode "
                        "(2 stations within the same town, mirrors a working "
                        "manual pattern). Different towns dispatch a pair "
-                       "route. The DLF Executor AI consumes the blueprint "
+                       "route. The Nutz Executor AI consumes the blueprint "
                        "and builds the infrastructure.",
         "inputSchema": {
             "type": "object",
@@ -289,7 +289,7 @@ def _err(rid: Any, code: int, message: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def main() -> int:
-    sys.stderr.write(f"DLF OpenTTD MCP server starting (protocol {PROTOCOL_VERSION})\n")
+    sys.stderr.write(f"Nutz OpenTTD MCP server starting (protocol {PROTOCOL_VERSION})\n")
     sys.stderr.flush()
     while True:
         try:

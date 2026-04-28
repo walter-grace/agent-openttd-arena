@@ -1,20 +1,20 @@
-"""Generate a per-scenario merged GameScript: dlf_bridge + town loader.
+"""Generate a per-scenario merged GameScript: nutz_bridge + town loader.
 
 OpenTTD allows ONLY ONE GameScript per game, so to get both:
   - the LLM/admin-port bridge (state push, sign mailbox, blueprint cmd)
   - auto-founded real-world towns at game start
 
 we must combine them into a single GS per scenario. This module clones
-the canonical dlf_bridge logic and prepends a one-shot town founder that
+the canonical nutz_bridge logic and prepends a one-shot town founder that
 inlines the town list as Squirrel literals.
 
 Generated layout:
-    ~/Documents/OpenTTD/game/dlf_bridge_<name>/
+    ~/Documents/OpenTTD/game/nutz_bridge_<name>/
         info.nut
         main.nut
 
-User picks "DLF Bridge: <name>" in Game Script Settings instead of the
-plain "DLF Bridge" - they get both features in one go.
+User picks "Nutz Bridge: <name>" in Game Script Settings instead of the
+plain "Nutz Bridge" - they get both features in one go.
 
 Tile math: Clockwise rotation (matches OpenTTD's CW heightmap path,
 which is also the only one not crashing in 15.3).
@@ -45,18 +45,18 @@ def generate_bridge_with_towns(towns: List[dict],
                                 scenario_name: str,
                                 out_dir: Path = Path.home() / "Documents/OpenTTD/game") -> dict:
     """Write a GS that founds inlined towns at start, then runs the
-    DLF bridge loop forever (state push + admin command handling)."""
+    Nutz bridge loop forever (state push + admin command handling)."""
     handle = _safe_handle(scenario_name)
     short = _short_code(handle)
     class_main = f"DlfBridgeWithTowns_{handle}Main"
     class_info = f"DlfBridgeWithTowns_{handle}Info"
-    folder = out_dir / f"dlf_bridge_{handle}"
+    folder = out_dir / f"nutz_bridge_{handle}"
     folder.mkdir(parents=True, exist_ok=True)
 
     info = f'''class {class_info} extends GSInfo {{
-    function GetAuthor()      {{ return "DLF"; }}
-    function GetName()        {{ return "DLF Bridge: {handle}"; }}
-    function GetDescription() {{ return "DLF Bridge (LLM admin-port + sign mailbox + blueprint cmd) PLUS auto-founds {len(towns)} real-world towns at game start."; }}
+    function GetAuthor()      {{ return "Nutz"; }}
+    function GetName()        {{ return "Nutz Bridge: {handle}"; }}
+    function GetDescription() {{ return "Nutz Bridge (LLM admin-port + sign mailbox + blueprint cmd) PLUS auto-founds {len(towns)} real-world towns at game start."; }}
     function GetVersion()     {{ return 1; }}
     function GetDate()        {{ return "2026-04-26"; }}
     function CreateInstance() {{ return "{class_main}"; }}
@@ -77,13 +77,13 @@ RegisterGS({class_info}());
         )
     towns_table = ",\n".join(rows)
 
-    main = f'''/* Auto-generated DLF Bridge + Town Loader for "{handle}".
+    main = f'''/* Auto-generated Nutz Bridge + Town Loader for "{handle}".
  *
  * One GameScript per game = combines:
  *   1. One-shot town founder (this file) - inlines {len(towns)} real-world
  *      towns and calls GSTown.FoundTown for each at startup.
- *   2. DLF bridge loop - state push to admin port, sign mailbox cmds,
- *      blueprint dispatch (mirrors ottd_user/game/dlf_bridge/main.nut).
+ *   2. Nutz bridge loop - state push to admin port, sign mailbox cmds,
+ *      blueprint dispatch (mirrors ottd_user/game/nutz_bridge/main.nut).
  *
  * Crucially: founding is INTERLEAVED with PushState so the admin port
  * sees state from tick 1, even while towns are still being placed. The
@@ -104,7 +104,7 @@ class {class_main} extends GSController {{
     init_failed = 0;
 
     function Start() {{
-        GSLog.Info("DLF Bridge+Towns '{handle}': starting bridge loop, will found {len(towns)} towns in background.");
+        GSLog.Info("Nutz Bridge+Towns '{handle}': starting bridge loop, will found {len(towns)} towns in background.");
         /* Push state IMMEDIATELY so admin port has scenario context even
          * before any town is founded. plan_route would otherwise fail with
          * "no towns in gs state" while founding is in progress. */
@@ -124,7 +124,7 @@ class {class_main} extends GSController {{
         ];
         if (this.init_index >= towns.len()) {{
             this.init_done = true;
-            GSLog.Info("DLF Bridge+Towns '{handle}': founding done. placed=" + this.init_placed + " failed=" + this.init_failed);
+            GSLog.Info("Nutz Bridge+Towns '{handle}': founding done. placed=" + this.init_placed + " failed=" + this.init_failed);
             return;
         }}
         local map_x = GSMap.GetMapSizeX();
@@ -187,7 +187,7 @@ class {class_main} extends GSController {{
         this.init_index = end;
     }}
 
-    /* ===== bridge loop (mirror of dlf_bridge/main.nut) ===== */
+    /* ===== bridge loop (mirror of nutz_bridge/main.nut) ===== */
 
     function PushState() {{
         local data = {{
@@ -287,7 +287,7 @@ class {class_main} extends GSController {{
         local cmd = obj["cmd"];
         if (cmd == "build" && obj.rawin("from") && obj.rawin("to")) {{
             local tile = GSMap.GetTileIndex(1, 1);
-            local text = "DLF:build:" + obj["from"] + ":" + obj["to"];
+            local text = "NUTZ:build:" + obj["from"] + ":" + obj["to"];
             GSSign.BuildSign(tile, text);
             GSAdmin.Send({{ kind = "ack", cmd = cmd, text = text }});
         }} else if (cmd == "blueprint") {{
@@ -296,7 +296,7 @@ class {class_main} extends GSController {{
             local sl = GSSignList();
             foreach (s, _ in sl) {{
                 local n = GSSign.GetName(s);
-                if (n != null && n.len() >= 4 && n.slice(0,4) == "DLF:") {{
+                if (n != null && n.len() >= 4 && n.slice(0,4) == "NUTZ:") {{
                     GSSign.RemoveSign(s);
                 }}
             }}
@@ -321,11 +321,11 @@ class {class_main} extends GSController {{
         local tA = sa[0]; local fA = sa[1];
         local tB = sb[0]; local fB = sb[1];
         local tD = depot[0]; local fD = depot[1];
-        if (GSSign.BuildSign(tA, "DLF:bp:" + job_str + ":S:fr=" + fA + ":eg=" + engine)) placed++;
-        if (GSSign.BuildSign(tB, "DLF:bp:" + job_str + ":E:fr=" + fB)) placed++;
-        if (GSSign.BuildSign(tD, "DLF:bp:" + job_str + ":D:fr=" + fD)) placed++;
+        if (GSSign.BuildSign(tA, "NUTZ:bp:" + job_str + ":S:fr=" + fA + ":eg=" + engine)) placed++;
+        if (GSSign.BuildSign(tB, "NUTZ:bp:" + job_str + ":E:fr=" + fB)) placed++;
+        if (GSSign.BuildSign(tD, "NUTZ:bp:" + job_str + ":D:fr=" + fD)) placed++;
         for (local i = 0; i < path.len(); i++) {{
-            if (GSSign.BuildSign(path[i], "DLF:bp:" + job_str + ":W:" + i)) placed++;
+            if (GSSign.BuildSign(path[i], "NUTZ:bp:" + job_str + ":W:" + i)) placed++;
         }}
         GSAdmin.Send({{ kind = "ack", cmd = "blueprint", job = job, placed = placed }});
     }}
@@ -349,4 +349,4 @@ if __name__ == "__main__":
     towns = json.loads(Path(args.towns_json).read_text())
     meta = generate_bridge_with_towns(towns, args.name)
     print(json.dumps(meta, indent=2))
-    print(f"\nIn OpenTTD: Game Script Settings -> 'DLF Bridge: {meta['handle']}'", file=sys.stderr)
+    print(f"\nIn OpenTTD: Game Script Settings -> 'Nutz Bridge: {meta['handle']}'", file=sys.stderr)

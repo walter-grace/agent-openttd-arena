@@ -104,7 +104,7 @@ class OpenTTDAdminClient:
     """Line-oriented admin-socket client, thread-safe reads into a queue."""
 
     def __init__(self, host: str = "127.0.0.1", port: int = 3977,
-                 password: str = "dlfflywheel", name: str = "DLFAgent",
+                 password: str = "nutzarena", name: str = "NutzAgent",
                  version: str = "0.1.0") -> None:
         self.host = host
         self.port = port
@@ -284,21 +284,21 @@ class OpenTTDAdminClient:
 
         origin is e.g. "ai" or the script's short name; message is the
         log line. We keep a short tail and expose lines tagged with a
-        script name (DLF Player, DLF Executor, ...) so the CEO can read
+        script name (Nutz Player, Nutz Executor, ...) so the CEO can read
         per-AI feedback. Non-script noise (network logs, etc.) is dropped.
         """
         origin, off = _read_cstr(p, 0)
         msg, _ = _read_cstr(p, off)
         if not msg:
             return
-        # OpenTTD AI log lines: origin is the script's GetName() ("DLF
-        # Executor", "DLF Player", etc.) and text is the message body.
-        # Keep lines whose origin OR text mentions DLF, plus any origin=="ai".
-        # (Old filter required "DLF" in TEXT, dropping lines like
+        # OpenTTD AI log lines: origin is the script's GetName() ("Nutz
+        # Executor", "Nutz Player", etc.) and text is the message body.
+        # Keep lines whose origin OR text mentions Nutz, plus any origin=="ai".
+        # (Old filter required "Nutz" in TEXT, dropping lines like
         # "ABORT job=99" / "stations placed" / "ROAD BUILT" - the most
         # important executor diagnostics.)
         text = msg.strip()
-        if ("DLF" not in text and "DLF" not in origin
+        if ("Nutz" not in text and "Nutz" not in origin
                 and origin.lower() != "ai"):
             return
         if self._console_log is None:
@@ -430,8 +430,8 @@ class OpenTTDAdminClient:
 
     def send_gs(self, json_str: str) -> None:
         """Send JSON (as a string) to the GameScript's admin-port event queue.
-        Our DLF Bridge GS listens for ET_ADMIN_PORT events and parses the
-        payload to place command signs that the DLF AIs poll each tick."""
+        Our Nutz Bridge GS listens for ET_ADMIN_PORT events and parses the
+        payload to place command signs that the Nutz AIs poll each tick."""
         self._send(ADMIN_PACKET_ADMIN_GAMESCRIPT, _pack_str(json_str))
 
     def rcon(self, command: str) -> None:

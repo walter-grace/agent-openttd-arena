@@ -27,8 +27,8 @@ Outputs (all under ~/Documents/OpenTTD/scenario/heightmap/<name>_*):
     *_heightmap.png    grayscale heightmap, ocean-clamped + auto-smoothed
     *_preview.png      colored preview with town markers
 And under ~/Documents/OpenTTD/game/:
-    dlf_town_loader_<name>/   standalone GS that founds towns at start
-    dlf_bridge_<name>/        merged GS: towns + LLM admin bridge
+    nutz_town_loader_<name>/   standalone GS that founds towns at start
+    nutz_bridge_<name>/        merged GS: towns + LLM admin bridge
 """
 from __future__ import annotations
 
@@ -108,9 +108,9 @@ def build(url: str, name: str, *, size: int = 2048, min_pop: int = 500,
     print(f"     map size {hm['width']}x{hm['height']},")
     print(f"     climate={out['climate_hint']}, No. of towns=Off,")
     print(f"     Industries=Low")
-    print(f"  3. Game Script Settings -> 'DLF Bridge: {bg['handle']}'")
+    print(f"  3. Game Script Settings -> 'Nutz Bridge: {bg['handle']}'")
     print(f"  4. Generate. Then in another terminal:")
-    print(f"       cd ~/vgbench-dlf/videogamebench")
+    print(f"       cd ~/videogamebench")
     print(f"       set -a && source .env && set +a")
     print(f"       python3 -u run_openttd.py --steps 1000 --interval 5")
     return out

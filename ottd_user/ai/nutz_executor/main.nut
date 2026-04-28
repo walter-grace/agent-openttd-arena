@@ -1,18 +1,18 @@
-/* DLF Executor AI - builds a blueprint placed in the world as signs.
+/* Nutz Executor AI - builds a blueprint placed in the world as signs.
  *
- * Sign protocol (placed by Python via dlf_bridge GS, or directly by a
+ * Sign protocol (placed by Python via nutz_bridge GS, or directly by a
  * sandbox bootstrap GS):
- *   DLF:bp:<job>:S:fr=<tile>:eg=<id>   placed at station-A tile
- *   DLF:bp:<job>:E:fr=<tile>           placed at station-B tile
- *   DLF:bp:<job>:W:<n>                 placed at every road-path tile
- *   DLF:bp:<job>:D:fr=<tile>           placed at depot tile
+ *   NUTZ:bp:<job>:S:fr=<tile>:eg=<id>   placed at station-A tile
+ *   NUTZ:bp:<job>:E:fr=<tile>           placed at station-B tile
+ *   NUTZ:bp:<job>:W:<n>                 placed at every road-path tile
+ *   NUTZ:bp:<job>:D:fr=<tile>           placed at depot tile
  *
  * Uses the official Pathfinder.Road library (Online Content -> AI
  * Library). The library handles slopes, water (auto-bridge), tunnels,
  * and obstacles end-to-end - replacing our older waypoint walker.
  *
  * Cleanup rule: on any phase failure, undo what we built (stations,
- * road, vehicle, depot) AND remove any DLF:bp:* signs we own.
+ * road, vehicle, depot) AND remove any NUTZ:bp:* signs we own.
  *
  * API 14, ASCII only.
  */
@@ -43,12 +43,12 @@ class DlfExecutorAI extends AIController {
     last_log        = "";
     routes_built    = 0;
     /* Job IDs we tried and aborted on. Without this we'd loop forever:
-     * abort -> phase=wait -> LoadBlueprint sees same DLF:bp:<job>:* signs
+     * abort -> phase=wait -> LoadBlueprint sees same NUTZ:bp:<job>:* signs
      * (they're GS-owned, we can't AISign.RemoveSign them) -> retry -> abort.
      * Skip blacklisted jobs in LoadBlueprint so the executor moves on. */
     failed_jobs     = null;
     /* Mirror of failed_jobs but for jobs we already SUCCEEDED on. The GS
-     * places DLF:bp:<job>:* signs once and never removes them, so without
+     * places NUTZ:bp:<job>:* signs once and never removes them, so without
      * this set the executor would re-pick bp1 forever and keep buying
      * extra buses on the same route. */
     succeeded_jobs  = null;
@@ -58,8 +58,8 @@ class DlfExecutorAI extends AIController {
     pax_cargo_id    = -1;
 
     function Start() {
-        AILog.Info("DLF Executor starting; idle until a DLF:bp blueprint arrives.");
-        AICompany.SetName("DLF Executor");
+        AILog.Info("Nutz Executor starting; idle until a NUTZ:bp blueprint arrives.");
+        AICompany.SetName("Nutz Executor");
         AICompany.SetPresidentName("Blueprint Builder");
         AICompany.SetLoanAmount(AICompany.GetMaxLoanAmount());
         AIRoad.SetCurrentRoadType(AIRoad.ROADTYPE_ROAD);
@@ -90,7 +90,7 @@ class DlfExecutorAI extends AIController {
      * AILog.Info to /dev/null, so we encode current phase + job into the
      * company name; admin port pushes companies[].name on every poll. */
     function SetPhase(p) {
-        local nm = "DLF " + p + " j" + this.job_id + " r" + this.routes_built;
+        local nm = "Nutz " + p + " j" + this.job_id + " r" + this.routes_built;
         if (nm.len() > 31) nm = nm.slice(0, 31);
         AICompany.SetName(nm);
     }
@@ -147,7 +147,7 @@ class DlfExecutorAI extends AIController {
         return [s.slice(0, eq), this.ToInt(s.slice(eq + 1))];
     }
 
-    /* Look for any DLF:bp:<job>:* signs and load the lowest job number
+    /* Look for any NUTZ:bp:<job>:* signs and load the lowest job number
      * as our active blueprint. Returns true if a complete blueprint was
      * found (start, end, depot, at least one waypoint). */
     function LoadBlueprint() {
@@ -156,8 +156,8 @@ class DlfExecutorAI extends AIController {
         local sign_owners = {}; /* job_id -> array of sign ids */
         foreach (sid, _ in sl) {
             local txt = AISign.GetName(sid);
-            if (!this.StartsWith(txt, "DLF:bp:")) continue;
-            local rest = txt.slice(7);  /* after "DLF:bp:" */
+            if (!this.StartsWith(txt, "NUTZ:bp:")) continue;
+            local rest = txt.slice(7);  /* after "NUTZ:bp:" */
             local parts = this.Split(rest, ':');
             if (parts.len() < 2) continue;
             local job = this.ToInt(parts[0]);
@@ -702,9 +702,9 @@ class DlfExecutorAI extends AIController {
     /* Encode bus state + station waiting passengers + bus tile coords into
      * the company name so we can read it from admin port (AILog is not
      * captured on macOS .app). 31-char limit. Format examples:
-     *   "DLF R wA12 wB05 t=137,99 j1"  - bus running, queues filling
-     *   "DLF S wA0 wB0 j1"              - bus stopped (Lost)
-     *   "DLF @ wA8 wB0 j1"              - bus at a station */
+     *   "Nutz R wA12 wB05 t=137,99 j1"  - bus running, queues filling
+     *   "Nutz S wA0 wB0 j1"              - bus stopped (Lost)
+     *   "Nutz @ wA8 wB0 j1"              - bus at a station */
     function DumpDiag() {
         if (this.built_vehicle == -1 || !AIVehicle.IsValidVehicle(this.built_vehicle)) {
             return;
@@ -740,7 +740,7 @@ class DlfExecutorAI extends AIController {
                 if (w > maxW) maxW = w;
             }
         }
-        local nm = "DLF " + stChar + sp + " mx" + maxW + " " + lx + "," + ly;
+        local nm = "Nutz " + stChar + sp + " mx" + maxW + " " + lx + "," + ly;
         if (nm.len() > 31) nm = nm.slice(0, 31);
         AICompany.SetName(nm);
     }
@@ -787,7 +787,7 @@ class DlfExecutorAI extends AIController {
         this.Log("ABORT job=" + this.job_id + " - rolling back");
         this.SetPhase("ABRT");
         /* Blacklist this job_id so LoadBlueprint skips it next tick. The
-         * GS-placed DLF:bp:<job>:* signs are not ours to remove, but we
+         * GS-placed NUTZ:bp:<job>:* signs are not ours to remove, but we
          * still need to stop trying. */
         if (this.job_id >= 0 && this.failed_jobs != null) {
             this.failed_jobs[this.job_id] <- 1;

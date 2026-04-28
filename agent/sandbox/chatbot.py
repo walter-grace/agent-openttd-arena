@@ -1,4 +1,4 @@
-"""DLF Chatbot — listens to in-game chat via admin port and replies.
+"""Nutz Chatbot — listens to in-game chat via admin port and replies.
 
 Run alongside the conductor:
     python3 -u -m sandbox.chatbot
@@ -29,7 +29,7 @@ except ImportError:
     from planner import plan_route  # type: ignore
 
 
-PROMPT = "DLF"
+PROMPT = "Nutz"
 
 
 def reply(c: OpenTTDAdminClient, msg: str) -> None:
@@ -75,7 +75,7 @@ def cmd_build(c: OpenTTDAdminClient, town_name: str, job_id: int) -> str:
 
 
 def main() -> int:
-    c = OpenTTDAdminClient(name="DLFBot")
+    c = OpenTTDAdminClient(name="NutzBot")
     c.connect()
     time.sleep(2)
     print("[chatbot] connected to admin port. Type in game chat: help")

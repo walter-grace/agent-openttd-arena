@@ -1,4 +1,4 @@
-"""Profit-seeking route conductor for DLF Executor.
+"""Profit-seeking route conductor for Nutz Executor.
 
 Replaces the 5 spammy personas (Player/Greedy/Green/Cautious/Freight)
 with a single coordinated planner. Each tick:
@@ -13,7 +13,7 @@ with a single coordinated planner. Each tick:
 Cheap: pure Python heuristic, no LLM. Run alongside run_openttd.py + executor.
 
 Usage:
-    cd ~/dlf-openttd/agent
+    cd ~/agent-openttd-arena/agent
     python3 -m sandbox.conductor
 
 Arguments:

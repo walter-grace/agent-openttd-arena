@@ -7,14 +7,14 @@ API. GameScripts run in Deity mode, which can found cities and large
 towns directly.
 
 Generated layout:
-    ~/Documents/OpenTTD/game/dlf_town_loader_<name>/
+    ~/Documents/OpenTTD/game/nutz_town_loader_<name>/
         info.nut
         main.nut    <- town list inlined as Squirrel literals
 
 User workflow:
     1. Open OpenTTD -> Scenario Editor or New Game
     2. Load Heightmap (PNG) with rotation = Clockwise (CCW is broken)
-    3. Game Script Settings -> select "DLF Town Loader: <name>"
+    3. Game Script Settings -> select "Nutz Town Loader: <name>"
     4. Generate
     5. At game start, the GS founds every town at its (x, y) coords
 
@@ -59,7 +59,7 @@ def generate_town_loader(towns: List[dict],
     handle = _safe_handle(scenario_name)
     short = _short_code(handle)
     class_base = "DlfTownLoader_" + handle
-    folder = out_dir / f"dlf_town_loader_{handle}"
+    folder = out_dir / f"nutz_town_loader_{handle}"
     folder.mkdir(parents=True, exist_ok=True)
 
     # info.nut
@@ -68,8 +68,8 @@ def generate_town_loader(towns: List[dict],
     # for FoundTown + SetName. Without this the names get dropped silently
     # and OpenTTD assigns random names from townnameparts.
     info = f'''class {info_class} extends GSInfo {{
-    function GetAuthor()      {{ return "DLF"; }}
-    function GetName()        {{ return "DLF Town Loader: {handle}"; }}
+    function GetAuthor()      {{ return "Nutz"; }}
+    function GetName()        {{ return "Nutz Town Loader: {handle}"; }}
     function GetDescription() {{ return "Founds {len(towns)} real-world towns from JSON at game start. Bypasses LoadTownData."; }}
     function GetVersion()     {{ return 1; }}
     function GetDate()        {{ return "2026-04-26"; }}
@@ -97,7 +97,7 @@ RegisterGS({info_class}());
         )
     towns_table = ",\n".join(rows)
 
-    main = f'''/* Auto-generated DLF Town Loader for "{handle}".
+    main = f'''/* Auto-generated Nutz Town Loader for "{handle}".
  * Founds towns at game start using GSTown.FoundTown (deity mode).
  * Tile math: Clockwise rotation (use rotation=Clockwise in heightmap load).
  */
@@ -109,7 +109,7 @@ class {class_base}Main extends GSController {{
         ];
         local map_x = GSMap.GetMapSizeX();
         local map_y = GSMap.GetMapSizeY();
-        GSLog.Info("DLF Town Loader '{handle}': founding " + towns.len() + " towns on " + map_x + "x" + map_y);
+        GSLog.Info("Nutz Town Loader '{handle}': founding " + towns.len() + " towns on " + map_x + "x" + map_y);
         local placed = 0;
         local failed = 0;
         foreach (t in towns) {{
@@ -164,7 +164,7 @@ class {class_base}Main extends GSController {{
                 GSLog.Warning(" - " + t.name + " could not be founded near (" + tx + "," + ty + ")");
             }}
         }}
-        GSLog.Info("DLF Town Loader '{handle}': placed=" + placed + " failed=" + failed);
+        GSLog.Info("Nutz Town Loader '{handle}': placed=" + placed + " failed=" + failed);
         while (true) {{ this.Sleep(50000); }}
     }}
 }}
@@ -189,4 +189,4 @@ if __name__ == "__main__":
     towns = json.loads(Path(args.towns_json).read_text())
     meta = generate_town_loader(towns, args.name)
     print(json.dumps(meta, indent=2))
-    print(f"\nIn OpenTTD: Game Script Settings -> 'DLF Town Loader: {meta['handle']}'", file=sys.stderr)
+    print(f"\nIn OpenTTD: Game Script Settings -> 'Nutz Town Loader: {meta['handle']}'", file=sys.stderr)

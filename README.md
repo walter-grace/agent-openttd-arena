@@ -19,7 +19,7 @@ Why? Because the most interesting agent benchmark isn't another puzzle suite. It
 | Component | Purpose |
 |---|---|
 | **MCP server** ([sandbox/mcp_server.py](agent/sandbox/mcp_server.py)) | Any LLM with MCP support drives the game |
-| **DLF Executor** ([ai/dlf_executor/main.nut](ottd_user/ai/dlf_executor/main.nut)) | Reference Squirrel AI — fork or rewrite |
+| **Nutz Executor** ([ai/nutz_executor/main.nut](ottd_user/ai/nutz_executor/main.nut)) | Reference Squirrel AI — fork or rewrite |
 | **Conductor** ([sandbox/conductor.py](agent/sandbox/conductor.py)) | Autonomous Python dispatcher |
 | **Bridge GS** ([sandbox/bridge_gs.py](agent/sandbox/bridge_gs.py)) | Exposes rich game state to admin port |
 | **Scenario builder** ([sandbox/build_scenario.py](agent/sandbox/build_scenario.py)) | Google Maps URL → real-world heightmap + town JSON |
@@ -50,7 +50,7 @@ Other agents pay (via [x402](https://x402.gitbook.io)) and the contracted agent 
 
 **Profit-sharing strategies** — agent A invests money in agent B's company in exchange for X% of future profits. Smart contract escrow.
 
-The MCP server gets new tools: `list_offers`, `accept_offer`, `pay_agent`, `query_balance`. Payments flow through the existing DLF gateway pattern.
+The MCP server gets new tools: `list_offers`, `accept_offer`, `pay_agent`, `query_balance`. Payments flow through the existing Nutz gateway pattern.
 
 ### 3. Skill files (OpenClaw pattern)
 
@@ -110,7 +110,7 @@ python3 -u -m agent.sandbox.conductor \
     --interval 30 --max-jobs 40 --intra-town --sat-cap 12
 ```
 
-Picks big towns, dispatches blueprints. The DLF Executor in-game consumes them and builds.
+Picks big towns, dispatches blueprints. The Nutz Executor in-game consumes them and builds.
 
 ### 4. Generate a real-world map
 
@@ -140,7 +140,7 @@ Drops heightmap + town JSON + bridge GS into your OpenTTD config. There's also a
                           │ Sign       │ ─► │ │  GS        │ │
                           │ Mailbox    │    │ └────────────┘ │
                           └────────────┘    │ ┌────────────┐ │
-                                            │ │  DLF       │ │
+                                            │ │  Nutz       │ │
                                             │ │  Executor  │ │
                                             │ │  AI        │ │
                                             │ └────────────┘ │
@@ -155,7 +155,7 @@ Future: replace stdio MCP with HTTP/SSE so distant agents can join the same game
 
 ### Build your own Squirrel AI
 
-`ottd_user/ai/dlf_executor/main.nut` is ~900 lines, heavily commented. Demonstrates:
+`ottd_user/ai/nutz_executor/main.nut` is ~900 lines, heavily commented. Demonstrates:
 - Reading blueprints from sign-mailbox
 - Pathfinder.Road for road construction (with bidirectional + drive-verify)
 - Town funding via `AITown.PerformTownAction`

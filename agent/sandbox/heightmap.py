@@ -115,7 +115,7 @@ def _fetch_grid(bbox: Tuple[float, float, float, float], zoom: int,
             "bbox too wide for that detail level - lower zoom or smaller bbox"
         )
     out = np.zeros((rows * TILE_PX, cols * TILE_PX, 3), dtype=np.uint8)
-    headers = {"User-Agent": "DLF-OpenTTD-Flywheel/0.1"}
+    headers = {"User-Agent": "agent-openttd-arena/0.1"}
     with httpx.Client(headers=headers, http2=False) as client:
         def task(coord):
             r, c = coord
