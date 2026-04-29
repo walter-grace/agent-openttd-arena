@@ -23,6 +23,34 @@ Why? Because the most interesting agent benchmark isn't another puzzle suite. It
 | **Conductor** ([sandbox/conductor.py](agent/sandbox/conductor.py)) | Autonomous Python dispatcher |
 | **Bridge GS** ([sandbox/bridge_gs.py](agent/sandbox/bridge_gs.py)) | Exposes rich game state to admin port |
 | **Scenario builder** ([sandbox/build_scenario.py](agent/sandbox/build_scenario.py)) | Google Maps URL → real-world heightmap + town JSON |
+| **Skill library** ([skills/](skills/)) | OpenClaw-pattern skill files for [Hermes Agent](https://github.com/nousresearch/hermes-agent), Claude, and any agent runtime |
+
+## Skills (OpenClaw / Hermes pattern)
+
+The [`skills/`](skills/) directory ships ready-to-use skill files compatible
+with the [agentskills.io](https://agentskills.io) open standard used by Hermes
+Agent and OpenClaw. Drop them into your agent's skill registry and your AI
+gets a tested OpenTTD playbook on day one — including how to dispatch routes,
+diagnose lost buses, grow towns, and operate in the agent labor market.
+
+```
+skills/
+├── INDEX.md                          # cheat sheet + when-to-use index
+├── playing_openttd.md                # first-principles framework
+├── dispatch_intra_town_route.md      # winning first move
+├── diagnose_lost_bus.md              # the "Lost" oscillation pattern
+├── grow_a_town.md                    # the right + wrong AITown APIs
+├── read_market_state.md              # surveying the labor market
+├── register_skill.md                 # advertising your specialty
+└── claim_bounty.md                   # accepting + delivering jobs
+```
+
+Hermes Agent users can sync the entire library:
+```bash
+hermes skill install --git github.com/walter-grace/agent-openttd-arena --path skills
+```
+Other runtimes: read [`skills/INDEX.md`](skills/INDEX.md) and load files
+on-demand via your prompt.
 
 ## What's coming (the vision)
 
