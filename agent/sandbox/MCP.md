@@ -110,6 +110,9 @@ Zed's settings:
 | `pause` / `unpause` | Game control |
 | `fund_town` | Advisory (in-game AI required to actually fund) |
 | `rcon` | Raw console command — escape hatch |
+| `read_squirrel_ai` | Return current contents of the in-game AI's `main.nut` |
+| `update_squirrel_ai` | Replace `main.nut` + live-reload the AI (gated by env flag) |
+| `propose_squirrel_diff` | Apply unified-diff patch to `main.nut` then reload (gated) |
 
 ## Try it
 
@@ -247,6 +250,86 @@ python3 agent/sandbox/test_x402_gate.py
 ```
 
 (14 tests, stdlib-only, no network.)
+
+## Self-modifying mode
+
+The agent can rewrite its own in-game playbook. `read_squirrel_ai` and
+`update_squirrel_ai` (plus the optional `propose_squirrel_diff`) expose the
+Nutz Executor AI's Squirrel source file (`~/Documents/OpenTTD/ai/nutz_executor/main.nut`)
+to the MCP client. An agent can fetch the current source, propose a new
+strategy, write it, and reload the AI in-game without restarting the server.
+
+**This is dangerous**: the new source is loaded by the OpenTTD VM and given
+full NoAI-API powers inside the game. To prevent prompt-injection attacks and
+runaway agents, mutating tools are **off by default**.
+
+### Enabling
+
+```bash
+export MCP_ALLOW_AI_EDIT=true
+python3 agent/sandbox/mcp_server.py
+```
+
+Without `MCP_ALLOW_AI_EDIT=true`, `update_squirrel_ai` and
+`propose_squirrel_diff` return a 403-shaped result and never touch the file
+system. `read_squirrel_ai` is always available — reading is safe.
+
+### Safety guardrails
+
+Every `update_squirrel_ai` call passes through these checks before a single
+byte hits disk:
+
+- **Size cap**: source > 200KB is rejected.
+- **AIController required**: source must reference `AIController` (the NoAI
+  base class) — otherwise the AI won't load.
+- **Import whitelist**: only `import("pathfinder.road", ...)` and
+  `import("graph.aystar", ...)` are permitted. Any other Squirrel `import(...)`
+  is rejected.
+- **Forbidden substrings**: `system(`, `exec(`, `Process(`, `system.exec`,
+  `popen(`, `spawn(`, `os.execute`, `io.open`, `io.popen`, `loadfile(`,
+  `dofile(`, `require(`.
+- **Brace/paren balance**: a crude balance check catches the worst syntax
+  mistakes before they reach the in-game parser.
+- **Auto-backup**: the existing `main.nut` is copied to
+  `main.nut.backup-<UTC ISO timestamp>` (e.g. `main.nut.backup-2026-04-28T20-15-00`)
+  before the new source is written.
+- **Auto-restore on crash**: after `start_ai`, the server waits 5 seconds and
+  inspects the company table. If no AI company is alive, the backup is copied
+  back over `main.nut` and `start_ai` is fired again — the old AI returns.
+
+### Reload pipeline
+
+On a successful write, the MCP server fires three rcon commands in order:
+
+```
+stop_ai <prior_company_id+1>     # if a Nutz Executor was already running
+rescan_ai                        # OpenTTD re-reads ai/ directory
+start_ai "Nutz Executor"         # boot the new code
+```
+
+The result includes the new `company_id`, the backup path, and the rcon
+commands that were sent.
+
+### `propose_squirrel_diff`
+
+Optional companion that takes a unified-diff patch (output of `diff -u` or
+`git diff`) instead of the full file. Internally: copies `main.nut` to a
+tempdir, applies the patch via the system `patch` command, then re-uses the
+exact same write+validate+reload pipeline as `update_squirrel_ai`. Useful for
+LLMs that want to make small surgical edits without re-emitting the whole
+file.
+
+### Tested vs. live
+
+The unit tests under `agent/sandbox/test_squirrel_ai_edit.py` cover
+validation, env gating, write+rcon sequencing, and the rollback-on-crash
+path with a stub admin client (no real OpenTTD connection). What needs the
+running game to verify end-to-end:
+
+- That the in-game AI actually re-spawns under the same company id after
+  `rescan_ai` + `start_ai`.
+- That the 5-second liveness window is long enough for OpenTTD's AI VM to
+  print a parse error before we declare success.
 
 ## Limitations
 

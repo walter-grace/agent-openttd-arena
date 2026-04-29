@@ -14,6 +14,8 @@ Tools:
     fund_town          - PerformTownAction TOWN_ACTION_FUND_BUILDINGS
     send_chat          - broadcast message in game chat
     pause / unpause    - game control via rcon
+    read_squirrel_ai   - read current AI source (.nut) — always safe
+    update_squirrel_ai - replace AI source + live-reload (DANGEROUS, env-gated)
 
 Configure for Claude Desktop in `claude_desktop_config.json`:
 
@@ -31,9 +33,13 @@ Then ask Claude: "list towns" / "build a route in Chino" / etc.
 from __future__ import annotations
 
 import json
+import os
+import re
+import shutil
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +63,148 @@ except ImportError:
 PROTOCOL_VERSION = "2025-03-26"
 SERVER_NAME = "openttd"
 SERVER_VERSION = "0.1.0"
+
+# ---------------------------------------------------------------------------
+# Self-modifying AI: paths, guardrails, env flag.
+# ---------------------------------------------------------------------------
+# Path to the live AI source file. Override for tests via the
+# NUTZ_AI_MAIN_NUT env var (test injects a tmpdir copy so no real game state
+# is touched).
+DEFAULT_AI_MAIN_NUT = Path.home() / "Documents" / "OpenTTD" / "ai" / "nutz_executor" / "main.nut"
+AI_NAME = "Nutz Executor"
+
+# Hard cap on .nut payload — defensive against runaway agent rewrites.
+MAX_NUT_BYTES = 200 * 1024  # 200 KB
+
+# Whitelist of allowed `import("...")` first-args. Squirrel `import` can pull
+# arbitrary native libraries — only the two AI libs the executor actually
+# needs are permitted. Pattern: import("name", "Class", version).
+ALLOWED_IMPORTS = {"pathfinder.road", "graph.aystar"}
+
+# Substrings that must NOT appear in the proposed source. These are hostile
+# patterns: shell-out attempts, file I/O, eval-style indirection. The Squirrel
+# VM the AI runs in shouldn't have most of these, but the agent may try
+# anyway — fail closed.
+FORBIDDEN_SUBSTRINGS = (
+    "system(",
+    "exec(",
+    "Process(",
+    "system.exec",
+    "popen(",
+    "spawn(",
+    "os.execute",
+    "io.open",
+    "io.popen",
+    "loadfile(",
+    "dofile(",
+    "require(",
+)
+
+# How long to wait after rcon reload before deciding the new AI is alive.
+RELOAD_LIVENESS_DELAY_S = 5.0
+
+# Regex to find import lines so we can validate them.
+_IMPORT_RE = re.compile(r'import\s*\(\s*"([^"]*)"')
+
+
+def _ai_edit_enabled() -> bool:
+    """Self-modifying mode is gated behind an explicit env var. Default OFF."""
+    return os.environ.get("MCP_ALLOW_AI_EDIT", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
+
+
+def _ai_main_nut_path() -> Path:
+    """Resolve target main.nut. Env override lets tests redirect at a tmp file
+    without touching a real OpenTTD install."""
+    override = os.environ.get("NUTZ_AI_MAIN_NUT")
+    return Path(override) if override else DEFAULT_AI_MAIN_NUT
+
+
+def _validate_squirrel_source(source: str) -> tuple[bool, str]:
+    """Cheap pre-flight checks before we let the bytes near the file system.
+    Returns (ok, reason). Reason is empty when ok=True."""
+    if not isinstance(source, str) or not source:
+        return False, "source must be a non-empty string"
+    nbytes = len(source.encode("utf-8"))
+    if nbytes > MAX_NUT_BYTES:
+        return False, f"source is {nbytes} bytes; cap is {MAX_NUT_BYTES}"
+    # The NoAI runtime requires a class extending AIController. Without one
+    # the AI won't even load — refuse rather than nuke the install.
+    if "AIController" not in source:
+        return False, "source must reference AIController (class extends AIController)"
+    # Whitelist imports. Any `import("foo"...)` whose name isn't in
+    # ALLOWED_IMPORTS is rejected.
+    for m in _IMPORT_RE.finditer(source):
+        name = m.group(1)
+        if name not in ALLOWED_IMPORTS:
+            return False, f"import {name!r} not in whitelist {sorted(ALLOWED_IMPORTS)}"
+    # Forbidden substrings.
+    for needle in FORBIDDEN_SUBSTRINGS:
+        if needle in source:
+            return False, f"forbidden substring {needle!r} in source"
+    # Crude balanced-brace sanity check — Squirrel is C-like, mismatched
+    # braces guarantee a parse error in-game which would crash the AI.
+    if source.count("{") != source.count("}"):
+        return False, "unbalanced braces"
+    if source.count("(") != source.count(")"):
+        return False, "unbalanced parens"
+    return True, ""
+
+
+def _backup_main_nut(target: Path) -> Path | None:
+    """Copy current main.nut to main.nut.backup-<ISO timestamp>. Returns the
+    backup path, or None if the source file doesn't exist yet (first write)."""
+    if not target.exists():
+        return None
+    ts = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%S")
+    backup = target.with_suffix(target.suffix + f".backup-{ts}")
+    shutil.copy2(target, backup)
+    return backup
+
+
+def _reload_ai_via_admin(client: OpenTTDAdminClient, company_id: int | None) -> dict:
+    """Bounce the Nutz Executor AI in-game via rcon. We don't get a clean
+    return code from rcon over admin — the response is async — so we just
+    fire the commands and let the caller verify liveness afterwards.
+
+    `company_id` is the existing AI's company id (0-indexed). If provided we
+    `stop_ai N` before `rescan_ai` + `start_ai`. If None we skip the stop
+    (no AI was running).
+    """
+    sent: list[str] = []
+    if company_id is not None and company_id >= 0:
+        # OpenTTD console: stop_ai takes the company NUMBER (1-indexed in UI,
+        # but the rcon `stop_ai` command takes the human-visible company id —
+        # i.e. the same one shown in the in-game company list).
+        cmd = f"stop_ai {company_id + 1}"
+        client.rcon(cmd)
+        sent.append(cmd)
+    client.rcon("rescan_ai")
+    sent.append("rescan_ai")
+    # Quoted name — must match info.nut GetName().
+    cmd = f'start_ai "{AI_NAME}"'
+    client.rcon(cmd)
+    sent.append(cmd)
+    return {"commands": sent}
+
+
+def _check_ai_alive(client: OpenTTDAdminClient, company_name_substr: str = "Nutz") -> tuple[bool, int | None]:
+    """Look at the cached company table for a company whose name or manager
+    references the AI. If we find an `is_ai` company tagged by Nutz, treat
+    it as alive. Returns (alive, company_id)."""
+    for cid, c in (client.companies or {}).items():
+        if not c.get("is_ai"):
+            continue
+        name = (c.get("name") or "") + " " + (c.get("manager") or "")
+        if company_name_substr.lower() in name.lower():
+            return True, cid
+    return False, None
+
+
+def _find_existing_ai_company(client: OpenTTDAdminClient) -> int | None:
+    alive, cid = _check_ai_alive(client)
+    return cid if alive else None
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +333,59 @@ TOOLS = [
             "required": ["command"],
         },
     },
+    {
+        "name": "read_squirrel_ai",
+        "description": "Return the current contents of the in-game Nutz "
+                       "Executor AI source file. Use this to understand the "
+                       "AI's current strategy before proposing modifications.",
+        "inputSchema": {"type": "object", "properties": {}},
+    },
+    {
+        "name": "update_squirrel_ai",
+        "description": "Replace the in-game Nutz Executor AI source file "
+                       "with new Squirrel code, then reload the AI in-game. "
+                       "Returns the new company_id and reload outcome. "
+                       "DANGEROUS — only enabled when MCP_ALLOW_AI_EDIT=true "
+                       "env var is set. Always auto-backs up; auto-restores "
+                       "on AI crash within 5s.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["source"],
+            "properties": {
+                "source": {
+                    "type": "string",
+                    "description": "Full new content of main.nut. Must "
+                                   "include the AIController class. ~200KB max.",
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Why you're changing it (logged for traceability)",
+                },
+            },
+        },
+    },
+    {
+        "name": "propose_squirrel_diff",
+        "description": "Apply a unified-diff patch to the in-game Nutz "
+                       "Executor AI source, then reload via the same pipeline "
+                       "as update_squirrel_ai. Easier than sending the whole "
+                       "file when you only want to tweak a few lines. "
+                       "DANGEROUS — same env gate (MCP_ALLOW_AI_EDIT=true) "
+                       "and validation rules apply post-patch.",
+        "inputSchema": {
+            "type": "object",
+            "required": ["patch"],
+            "properties": {
+                "patch": {
+                    "type": "string",
+                    "description": "Unified-diff patch text (output of `diff -u` "
+                                   "/ `git diff`). Applied with the system "
+                                   "`patch` command in dry-run-then-apply mode.",
+                },
+                "reason": {"type": "string"},
+            },
+        },
+    },
 ]
 
 
@@ -257,7 +458,156 @@ def call_tool(name: str, args: dict) -> dict:
     if name == "rcon":
         c.rcon(args["command"])
         return _text({"ok": True, "sent": args["command"]})
+    if name == "read_squirrel_ai":
+        path = _ai_main_nut_path()
+        if not path.exists():
+            return _text({"ok": False, "reason": f"main.nut not found at {path}"})
+        try:
+            src = path.read_text(encoding="utf-8")
+        except Exception as e:
+            return _text({"ok": False, "reason": f"read failed: {e}"})
+        return _text({
+            "ok": True,
+            "path": str(path),
+            "bytes": len(src.encode("utf-8")),
+            "source": src,
+        })
+    if name == "update_squirrel_ai":
+        return _do_update_squirrel_ai(c, args)
+    if name == "propose_squirrel_diff":
+        return _do_propose_squirrel_diff(c, args)
     return _text({"error": f"unknown tool {name}"})
+
+
+def _do_update_squirrel_ai(c: OpenTTDAdminClient, args: dict) -> dict:
+    """Handler for update_squirrel_ai. Validates -> backs up -> writes ->
+    reloads AI -> waits RELOAD_LIVENESS_DELAY_S -> rolls back if dead."""
+    if not _ai_edit_enabled():
+        return _text({
+            "ok": False,
+            "status": 403,
+            "error": "Self-modifying mode is disabled.",
+            "hint": "Set MCP_ALLOW_AI_EDIT=true on the MCP server's env to enable.",
+        })
+    source = args.get("source")
+    reason = args.get("reason") or ""
+    ok, why = _validate_squirrel_source(source)
+    if not ok:
+        return _text({"ok": False, "status": 400, "error": "validation failed", "reason": why})
+
+    target = _ai_main_nut_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    backup = _backup_main_nut(target)
+
+    # Identify any currently-running Nutz AI so we can stop it cleanly.
+    prior_cid = _find_existing_ai_company(c)
+
+    try:
+        target.write_text(source, encoding="utf-8")
+    except Exception as e:
+        return _text({
+            "ok": False, "status": 500,
+            "error": f"write failed: {e}",
+            "backup": str(backup) if backup else None,
+        })
+
+    sys.stderr.write(
+        f"[update_squirrel_ai] wrote {len(source.encode('utf-8'))}B to "
+        f"{target} (backup={backup}, reason={reason!r})\n"
+    )
+    sys.stderr.flush()
+
+    reload_info = _reload_ai_via_admin(c, prior_cid)
+
+    # Wait briefly for the AI to either come up or crash.
+    time.sleep(RELOAD_LIVENESS_DELAY_S)
+    alive, new_cid = _check_ai_alive(c)
+
+    if not alive and backup is not None:
+        # Auto-rollback. Restore previous source and try once more.
+        try:
+            shutil.copy2(backup, target)
+            sys.stderr.write(
+                f"[update_squirrel_ai] AI dead after reload — restored backup "
+                f"{backup}\n"
+            )
+            sys.stderr.flush()
+            _reload_ai_via_admin(c, None)
+        except Exception as e:
+            return _text({
+                "ok": False, "status": 500,
+                "error": "AI failed to start AND backup restore failed",
+                "restore_error": str(e),
+                "backup": str(backup),
+                "reload": reload_info,
+            })
+        return _text({
+            "ok": False, "status": 500,
+            "error": "AI failed to start within 5s — rolled back to previous source",
+            "backup_restored": str(backup),
+            "reload": reload_info,
+        })
+
+    return _text({
+        "ok": True,
+        "company_id": new_cid,
+        "path": str(target),
+        "backup": str(backup) if backup else None,
+        "reload": reload_info,
+        "reason": reason,
+    })
+
+
+def _do_propose_squirrel_diff(c: OpenTTDAdminClient, args: dict) -> dict:
+    """Handler for propose_squirrel_diff. Applies unified diff via the system
+    `patch` command, then re-uses the update pipeline."""
+    if not _ai_edit_enabled():
+        return _text({
+            "ok": False, "status": 403,
+            "error": "Self-modifying mode is disabled.",
+            "hint": "Set MCP_ALLOW_AI_EDIT=true on the MCP server's env to enable.",
+        })
+    patch_text = args.get("patch")
+    if not isinstance(patch_text, str) or not patch_text.strip():
+        return _text({"ok": False, "status": 400, "error": "patch is required"})
+
+    target = _ai_main_nut_path()
+    if not target.exists():
+        return _text({"ok": False, "status": 400,
+                      "error": f"main.nut not found at {target}; cannot diff"})
+
+    import subprocess
+    import tempfile
+    # Apply against a copy so we can validate before swapping in.
+    with tempfile.TemporaryDirectory() as td:
+        td_path = Path(td)
+        scratch = td_path / "main.nut"
+        shutil.copy2(target, scratch)
+        patch_file = td_path / "p.diff"
+        patch_file.write_text(patch_text, encoding="utf-8")
+        # `patch` is a hard dep — present on macOS + every Linux dev box.
+        try:
+            proc = subprocess.run(
+                ["patch", "-u", "-p0", str(scratch.name), str(patch_file)],
+                cwd=td_path, capture_output=True, text=True, timeout=10,
+            )
+        except FileNotFoundError:
+            return _text({"ok": False, "status": 500,
+                          "error": "system `patch` command not found"})
+        except subprocess.TimeoutExpired:
+            return _text({"ok": False, "status": 500, "error": "patch timed out"})
+        if proc.returncode != 0:
+            return _text({
+                "ok": False, "status": 400,
+                "error": "patch failed to apply",
+                "stdout": proc.stdout, "stderr": proc.stderr,
+            })
+        new_source = scratch.read_text(encoding="utf-8")
+
+    # Re-use the full update pipeline: validates, backs up, writes, reloads,
+    # rolls back on AI crash.
+    return _do_update_squirrel_ai(c, {"source": new_source,
+                                      "reason": args.get("reason") or "diff-patch"})
 
 
 def _text(obj: Any) -> dict:
