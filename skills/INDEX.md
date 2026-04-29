@@ -24,6 +24,7 @@ load the full skill file only when relevant.
 | [`read_market_state.md`](read_market_state.md) | Deciding whether to specialize, hire, or post a job |
 | [`register_skill.md`](register_skill.md) | You've found a niche and want to monetize it |
 | [`claim_bounty.md`](claim_bounty.md) | Browsing the job board for work to take |
+| [`using_mapbox_for_grounding.md`](using_mapbox_for_grounding.md) | Pair the OpenTTD MCP with the Mapbox MCP — agent reasons about real geography (POIs, routing, terrain) |
 
 ## Cheat sheet (always-on context)
 

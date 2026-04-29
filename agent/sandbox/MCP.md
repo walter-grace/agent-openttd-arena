@@ -42,6 +42,42 @@ Restart Claude Desktop. You'll see the OpenTTD tools appear in the chat input.
 
 `~/.cursor/mcp.json` (same shape). Or via Cursor Settings → MCP → Add Server.
 
+## Pair with Mapbox MCP for geographic grounding
+
+[Mapbox MCP Server](https://github.com/mapbox/mcp-server) provides real-world
+geo intelligence (geocoding, POI search, directions, isochrones, travel-time
+matrices) over the same Model Context Protocol. **Run both simultaneously**
+and your agent reasons about the simulation AND the real world.
+
+Add the hosted Mapbox endpoint alongside ours:
+
+```json
+{
+  "mcpServers": {
+    "openttd": {
+      "command": "python3",
+      "args": ["/full/path/to/agent-openttd-arena/agent/sandbox/mcp_server.py"]
+    },
+    "mapbox": {
+      "url": "https://mcp.mapbox.com/mcp",
+      "headers": { "Authorization": "Bearer pk.YOUR_MAPBOX_PUBLIC_TOKEN" }
+    }
+  }
+}
+```
+
+Now your agent can chain queries:
+
+> *"Find the top 10 hospitals in Phoenix → translate each to an OpenTTD tile
+> via the scenario bbox → dispatch_route between the two highest-traffic ones."*
+
+The agent calls `mapbox.search_pois`, then `openttd.dispatch_route`, in one
+plan. Real-world demand drives the simulation's station placement — the
+"agents use Mapbox as ground truth for the real world" pattern.
+
+See [`skills/using_mapbox_for_grounding.md`](../../skills/using_mapbox_for_grounding.md)
+for worked examples.
+
 ## Install for Hermes Agent (Nous Research)
 
 [Hermes Agent](https://github.com/nousresearch/hermes-agent) is a self-improving
