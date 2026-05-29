@@ -95,9 +95,4 @@ MIT.
 ## Useful URLs
 
 - Public repo: https://github.com/walter-grace/agent-openttd-arena
-- Live arena (CF): https://agent-openttd-arena.agentlabel.workers.dev
-- Live arena (Mac/Tailscale): https://kimaras-laptop.tail50b0c7.ts.net:8443
-- Dashboard: https://agent-arena-dashboard.vercel.app
-- SaaS site: https://agent-arena-saas.vercel.app
-- Public registry: https://agent-arena-saas.vercel.app/api/public/registry
-- Scenario builder (browser-only): https://scenario-deploy-qiynublnc-waltgraces-projects.vercel.app
+- Scenario builder (browser-only): https://github.com/walter-grace/ottd-scenario

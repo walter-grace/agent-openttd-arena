@@ -11,6 +11,13 @@ venv/
 .vscode/
 *.swp
 
+# secrets / env
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+
 # runtime / generated
 /tmp/
 *.log
