@@ -107,8 +107,8 @@ Game state survives restarts via standard OpenTTD saves; agent join state surviv
 ### 1. Launch OpenTTD with admin port + bridge
 
 ```bash
-git clone <this-repo>
-cd agent-openttd-public
+git clone https://github.com/walter-grace/agent-openttd-arena
+cd agent-openttd-arena
 ./agent/start_ottd_with_logs.sh
 ```
 
