@@ -22,6 +22,14 @@ ADMIN_PW="${ADMIN_PW:-nutzarena}"
 ADMIN_PORT="${ADMIN_PORT:-3977}"
 GAME_PORT="${GAME_PORT:-3979}"
 SERVER_NAME="${SERVER_NAME:-arena}"
+# Public multiplayer: PUBLIC=1 registers with OpenTTD's Game Coordinator, which
+# NAT-punches so remote human clients can join by invite code (no port-forward).
+# PUBLIC=2 = invite-only. Agents do NOT use this — they connect over HTTP MCP
+# (see mcp_http.py + the gateway); this only governs the OpenTTD game socket.
+PUBLIC="${PUBLIC:-0}"
+MAX_COMPANIES="${MAX_COMPANIES:-8}"     # how many companies/agents share the world
+MAX_CLIENTS="${MAX_CLIENTS:-25}"
+SERVER_PASSWORD="${SERVER_PASSWORD:-}"  # optional join password for humans
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OTTD_BIN="/Applications/OpenTTD.app/Contents/MacOS/openttd"
 OPENGFX_VER="7.1"
@@ -88,9 +96,10 @@ PY
 # slot lines ("none" = empty; replace with the script's GetName()).
 CFG="$OTTD_DIR/openttd.cfg"
 say "Writing config with admin port + AI + GameScript…"
-python3 - "$CFG" "$ADMIN_PW" "$ADMIN_PORT" "$SERVER_NAME" <<'PY'
+python3 - "$CFG" "$ADMIN_PW" "$ADMIN_PORT" "$SERVER_NAME" "$PUBLIC" "$MAX_COMPANIES" "$MAX_CLIENTS" "$SERVER_PASSWORD" <<'PY'
 import sys, re, os
 cfg, pw, port, name = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+public, max_co, max_cl, srv_pw = sys.argv[5], sys.argv[6], sys.argv[7], sys.argv[8]
 s = open(cfg).read() if os.path.exists(cfg) else ""
 
 def set_kv(s, section, key, val):
@@ -110,10 +119,13 @@ for sec, k, v in [
     ("network", "server_admin_port", port),
     ("network", "allow_insecure_admin_login", "true"),
     ("network", "server_name", name),
-    ("network", "server_game_type", "0"),      # 0=LAN/local, 1=public
+    ("network", "server_game_type", public),   # 0=LAN/local, 1=public, 2=invite-only
+    ("network", "max_companies", max_co),
+    ("network", "max_clients", max_cl),
+    ("network", "server_password", srv_pw),
     ("network", "autoclean_companies", "false"),
     ("ai", "ai_in_multiplayer", "true"),
-    ("difficulty", "max_no_competitors", "4"),
+    ("difficulty", "max_no_competitors", max_co),
 ]:
     s = set_kv(s, sec, k, v)
 
@@ -172,11 +184,22 @@ if [ "${START_DASHBOARD:-1}" = "1" ]; then
   sleep 2
 fi
 
+# If public, OpenTTD registers with the Game Coordinator and logs an invite
+# code remote players use to join without any port-forwarding.
+NET_LINE="server name : $SERVER_NAME   (Multiplayer → Search LAN)"
+if [ "$PUBLIC" != "0" ]; then
+  INVITE="$(grep -oiE "invite code[: ]+\+[A-Za-z0-9]+" "$LOG" | grep -oE "\+[A-Za-z0-9]+" | tail -1 || true)"
+  [ -z "$INVITE" ] && INVITE="(registering… check: tail -f $LOG | grep -i invite)"
+  NET_LINE="visibility  : PUBLIC (game type $PUBLIC) — remote clients join by invite code
+  invite code : $INVITE   (OpenTTD → Multiplayer → Add server → paste this)"
+fi
+
 cat <<EOF
 
 $(say "Arena server is up.")
   dashboard   : http://localhost:$DASH_PORT      ← open this to watch the game
-  server name : $SERVER_NAME   (find it in OpenTTD → Multiplayer → Search LAN)
+  $NET_LINE
+  companies   : up to $MAX_COMPANIES ($MAX_CLIENTS clients) can share this world
   game port   : 127.0.0.1:$GAME_PORT   (join here to watch/play natively)
   admin port  : 127.0.0.1:$ADMIN_PORT  (password: $ADMIN_PW — the MCP layer uses this)
   console     : echo "<cmd>" > $FIFO    (e.g.  echo "companies" > $FIFO)
