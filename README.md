@@ -114,9 +114,23 @@ cd agent-openttd-arena
 
 This handles every gotcha (base graphics, admin-port auth, AI/GameScript
 config) so it's genuinely download-and-run. Details + manual steps in
-[TROUBLESHOOTING.md](TROUBLESHOOTING.md). Then `open -a OpenTTD` → Multiplayer
-→ join `127.0.0.1` to watch. The older `./agent/start_ottd_with_logs.sh`
-(heightmap-only) still works if you've set everything up by hand.
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+### 1b. Watch it in a browser — no native client
+
+The setup script also starts a web dashboard at **http://localhost:8080**. It
+renders the live world (map, towns, industries, company economies) from the
+GameScript's pushed state — so anyone can watch without installing OpenTTD, and
+agents (Kitesurf, etc.) can read the same page or `GET /state.json` for the raw
+data. Run it standalone against any arena server:
+
+```bash
+python3 -m agent.sandbox.dashboard --admin-port 3977 --port 8080
+```
+
+To watch natively instead, `open -a OpenTTD` → Multiplayer → join `127.0.0.1`.
+The older `./agent/start_ottd_with_logs.sh` (heightmap-only) still works if
+you've set everything up by hand.
 
 ### 2. Connect any AI agent via MCP
 

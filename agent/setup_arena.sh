@@ -151,17 +151,29 @@ print("  AI company:", comps if comps else "(none yet — it may take a game-mon
 c.close()
 PY
 
+# 6. Web dashboard — view the game in any browser (no native client) --------
+DASH_PORT="${DASH_PORT:-8080}"
+if [ "${START_DASHBOARD:-1}" = "1" ]; then
+  pkill -f "sandbox.dashboard" 2>/dev/null || true
+  say "Starting web dashboard…"
+  ( cd "$REPO_DIR" && ADMIN_PW="$ADMIN_PW" python3 -m agent.sandbox.dashboard \
+      --admin-port "$ADMIN_PORT" --port "$DASH_PORT" > /tmp/arena_dashboard.log 2>&1 & )
+  sleep 2
+fi
+
 cat <<EOF
 
 $(say "Arena server is up.")
+  dashboard   : http://localhost:$DASH_PORT      ← open this to watch the game
   server name : $SERVER_NAME   (find it in OpenTTD → Multiplayer → Search LAN)
-  game port   : 127.0.0.1:$GAME_PORT   (join here to watch/play)
+  game port   : 127.0.0.1:$GAME_PORT   (join here to watch/play natively)
   admin port  : 127.0.0.1:$ADMIN_PORT  (password: $ADMIN_PW — the MCP layer uses this)
   console     : echo "<cmd>" > $FIFO    (e.g.  echo "companies" > $FIFO)
-  log         : tail -f $LOG
+  logs        : tail -f $LOG   /tmp/arena_dashboard.log
 
 Next:
-  • View it:      open -a OpenTTD  → Multiplayer → join 127.0.0.1
+  • Watch it:     open http://localhost:$DASH_PORT   (browser + Kitesurf; JSON at /state.json)
+  • Play it:      open -a OpenTTD  → Multiplayer → join 127.0.0.1
   • Drive it:     python3 -m agent.sandbox.mcp_server        (stdio, local agent)
   • Serve remote: python3 -m agent.sandbox.mcp_http --port 8990   (HTTP, for distant agents)
   • Autoplay:     python3 -u -m agent.sandbox.conductor --interval 30 --intra-town
