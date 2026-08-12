@@ -106,16 +106,17 @@ for sec, k, v in [
 ]:
     s = set_kv(s, sec, k, v)
 
-# AI slot: first empty slot → Nutz Executor
-if "[ai_players]" not in s:
-    s += "\n[ai_players]\nNutz Executor = \n"
-else:
-    s = re.sub(r"\[ai_players\]\n(?:none = \n)*", "[ai_players]\nNutz Executor = \nnone = \nnone = \nnone = \n", s, count=1)
-# GS slot: → the bridge
-if "[game_scripts]" not in s:
-    s += "\n[game_scripts]\nNutz Bridge: arena = \n"
-else:
-    s = re.sub(r"\[game_scripts\]\n(?:none = \n|Nutz Bridge: arena = \n)*", "[game_scripts]\nNutz Bridge: arena = \n", s, count=1)
+# AI + GS slots. CRITICAL: OpenTTD's config parser truncates the script
+# name at the first SPACE ("Nutz Executor" -> "Nutz" -> "not found"), so the
+# name MUST be quoted. Replace the whole section body to stay idempotent
+# across OpenTTD's own config rewrites (it resets unknown slots to "none").
+def set_section(s, name, body):
+    pat = re.compile(r"\[" + re.escape(name) + r"\]\n(?:.*?\n)*?(?=\n\[|\Z)")
+    block = f"[{name}]\n{body}\n"
+    return pat.sub(block, s, count=1) if ("[" + name + "]") in s else s.rstrip() + f"\n\n{block}"
+
+s = set_section(s, "ai_players", '"Nutz Executor" = \nnone = \nnone = \nnone = ')
+s = set_section(s, "game_scripts", '"Nutz Bridge: arena" = ')
 
 open(cfg, "w").write(s)
 print("config written:", cfg)
@@ -125,11 +126,30 @@ PY
 # Stop any dedicated server we started earlier so ports don't conflict.
 pkill -f "OpenTTD.app.*openttd.*-D" 2>/dev/null && { warn "stopped a running dedicated server"; sleep 2; } || true
 FIFO=/tmp/ottd_cmd; LOG=/tmp/ottd_stdout.log
-rm -f "$FIFO"; mkfifo "$FIFO"; ( tail -f /dev/null > "$FIFO" & )
+# Keep the FIFO open for console input. Redirect the keeper's streams to
+# /dev/null so it never holds this script's stdout/stderr open (else a caller
+# that pipes our output hangs waiting for EOF).
+rm -f "$FIFO"; mkfifo "$FIFO"; ( tail -f /dev/null > "$FIFO" 2>/dev/null </dev/null & )
 GARG=(-g); [ -n "${HEIGHTMAP:-}" ] && GARG=(-g "$HEIGHTMAP")
 say "Starting dedicated server…"
 ( "$OTTD_BIN" -D "${GARG[@]}" -c "$CFG" > "$LOG" 2>&1 < "$FIFO" & )
-sleep 6
+sleep 8
+
+# Start the AI via the admin port. The [ai_players] slot alone doesn't spawn
+# an AI on a dedicated -g game, so kick it explicitly (rcon, reliable).
+say "Starting the Nutz Executor AI…"
+python3 - "$ADMIN_PORT" "$ADMIN_PW" "$REPO_DIR/agent" <<'PY' || warn "could not auto-start AI — run: (admin) start_ai \"Nutz Executor\""
+import sys, time
+sys.path.insert(0, sys.argv[3])
+from admin_client import OpenTTDAdminClient as C
+port, pw = int(sys.argv[1]), sys.argv[2]
+c = C(password=pw, port=port); c.connect()
+c.rcon('start_ai "Nutz Executor"')
+time.sleep(4); c._poll(2); time.sleep(2)
+comps = getattr(c, "companies", {})
+print("  AI company:", comps if comps else "(none yet — it may take a game-month)")
+c.close()
+PY
 
 cat <<EOF
 
