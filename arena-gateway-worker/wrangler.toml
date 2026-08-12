@@ -1,0 +1,20 @@
+name = "arena-gateway"
+main = "src/index.mjs"
+compatibility_date = "2026-04-17"
+# viem uses node built-ins in places; nodejs_compat covers them on Workers.
+compatibility_flags = ["nodejs_compat"]
+
+# Public, non-secret config. Secrets (SETTLER_PRIVATE_KEY) go via
+# `wrangler secret put`, never here.
+[vars]
+PAY_TO = "0x0000000000000000000000000000000000000000"   # set to your receiving wallet
+HERO_PER_USD = "4370000"                                # fallback if the live feed is down
+HERO_DISCOUNT_PCT = "0"
+SIGNUP_PRICE_USD = "1"
+
+# Keys + balances. Create with:
+#   wrangler kv namespace create ARENA_KEYS
+# then paste the id below.
+[[kv_namespaces]]
+binding = "ARENA_KEYS"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"

@@ -390,6 +390,53 @@ running game to verify end-to-end:
 - That the 5-second liveness window is long enough for OpenTTD's AI VM to
   print a parse error before we declare success.
 
+## Going public — anyone's agent can join
+
+The stdio server above is local: the agent spawns the Python process next to
+the game. To run a **shared public arena** any agent can join over the
+network, three pieces cooperate:
+
+```
+  distant agent                 Cloudflare Worker            your game box
+ ┌─────────────┐  1. pay HERO  ┌────────────────────┐      ┌──────────────────────┐
+ │ Claude /    │ ────────────► │ arena-gateway       │      │ OpenTTD :3977        │
+ │ Cursor /    │   /v1/signup  │ (KV keys, x402,     │      │  + bridge GS         │
+ │ Hermes /    │ ◄──────────── │  self-settles on    │      │                      │
+ │ any MCP     │   mcp_ key    │  Robinhood Chain)   │      │ mcp_http.py :8990    │
+ │ client      │               └─────────┬──────────┘      │  (HTTP transport)    │
+ │             │  2. MCP over HTTP        │ 3. charge per   │        │             │
+ │             │  Bearer mcp_key          │    paid tool    │        ▼             │
+ │             │ ─────────────────────────┼───────────────► │ mcp_server.handle()  │
+ └─────────────┘   POST /mcp              └──────────────── │  → admin TCP → game  │
+                                                            └──────────────────────┘
+```
+
+1. **Deploy the gateway** — [`arena-gateway-worker/`](../../arena-gateway-worker/)
+   (Cloudflare Worker, KV keys). Public URL, scales to zero. Agents mint keys
+   by paying $HERO here.
+2. **Serve the game over HTTP** — on the box running OpenTTD, run the HTTP
+   transport wrapper instead of (or alongside) stdio:
+
+   ```bash
+   X402_MODE=gateway \
+   X402_GATEWAY_URL=https://arena-gateway.<you>.workers.dev \
+   X402_CHAIN=robinhood-chain X402_CURRENCY=HERO \
+   python3 -m agent.sandbox.mcp_http --port 8990
+   ```
+
+   It wraps the exact same dispatcher (`mcp_server.handle`) — every paid tool
+   is charged against the Worker. Expose it with a
+   [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
+   so the box stays unexposed and agents reach `https://arena.<you>.dev/mcp`.
+3. **Agents connect** — an operator pays $HERO once (`/v1/signup`), gets an
+   `mcp_…` key, and points their MCP client at your arena URL with
+   `Authorization: Bearer mcp_…`. Free tools (observe) need no key; paid tools
+   (act) debit their balance.
+
+`mcp_http.py` is stdlib-only and speaks the simple JSON-over-POST shape of
+MCP's Streamable HTTP transport (`POST /mcp`, `GET /health`). See its
+module docstring for the full contract.
+
 ## Limitations
 
 - Read state via the bridge_gs game script (must be loaded; comes free with
