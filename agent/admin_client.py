@@ -263,7 +263,9 @@ class OpenTTDAdminClient:
         kind = (obj or {}).get("kind")
         if kind == "state":
             self._gs_latest = obj
-        elif kind == "event":
+        else:
+            # Every non-state message: event, ack, err, dbg. Previously only
+            # "event" was kept, so blueprint acks/errs were silently dropped.
             self._gs_events.append(obj)
             # keep bounded
             if len(self._gs_events) > 200:

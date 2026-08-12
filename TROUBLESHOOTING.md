@@ -109,6 +109,41 @@ capturing replies is flaky when the process is detached. For interactive
 control, run the server in a terminal you can see, or use the admin port
 (`admin_client.py`) which is the intended programmatic interface.
 
+### 9. The AI crashes on compile — missing `pathfinder.road` library
+The single biggest reason "agents don't build": the Nutz Executor imports the
+standard `pathfinder.road` library (`import("pathfinder.road", "Road", 3)`),
+which OpenTTD normally downloads from its content service. A headless server
+can't, so the AI dies instantly:
+```
+dbg: [script:0] Your script made an error: couldn't find library 'pathfinder.road' with version 3
+dbg: [squirrel] Failed to compile '.../nutz_executor/main.nut'
+dbg: [script:0] The script died unexpectedly.
+```
+The company still spawns (so it *looks* fine over the admin port) but the AI
+never runs a line — its company name stays `Unnamed` instead of becoming
+`Nutz Executor`. **Fix:** the libraries (Pathfinder.Road v3, Graph.AyStar,
+Queue.BinaryHeap) are vendored in [`ottd_user/ai/library/`](ottd_user/ai/library/)
+and `setup_arena.sh` copies them into `content_download/ai/library/`. OpenTTD
+only scans libraries at **startup**, so if you add them to a running server,
+restart it. Verify: the executor company's name reads `Nutz Executor`, not
+`Unnamed`.
+
+### 10. Blueprint acks were silently dropped by the admin client
+`admin_client._gs_push` used to keep only `kind == "event"` messages, so the
+GameScript's blueprint `ack`/`err` replies never reached `drain_gs_events()` —
+making it look like the GS ignored commands when it was actually replying. Now
+every non-`state` message (event, ack, err) is captured. If you dispatch a
+blueprint you should see `{"kind":"ack","cmd":"blueprint","placed":13}`.
+
+### Known-open: the executor doesn't yet consume dispatched blueprints
+With #9 fixed the executor compiles, runs, and maxes its loan (build prep), and
+the GS acknowledges each blueprint by placing `NUTZ:bp:*` signs. But the
+executor isn't picking those signs up and building — its `AISignList()` scan
+finds nothing to act on. This is the GS→AI sign-mailbox handoff (deity-owned
+signs vs. the AI's sign list) and is the last piece for fully-autonomous
+building. Read-only tools and admin-driven actions (`fund_town`, `send_chat`,
+`pause`, `rcon`) work regardless.
+
 ## Verifying it worked
 
 ```bash

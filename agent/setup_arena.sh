@@ -55,10 +55,21 @@ else
   say "Base graphics present."
 fi
 
-# 3. Content: Nutz Executor AI + bridge GameScript ------------------------
+# 3. Content: Nutz Executor AI + its libraries + bridge GameScript --------
 mkdir -p "$OTTD_DIR/ai" "$OTTD_DIR/game"
 cp -R "$REPO_DIR/ottd_user/ai/nutz_executor" "$OTTD_DIR/ai/"
 say "Nutz Executor AI installed."
+# The AI imports pathfinder.road v3 (+ its deps). A headless server can't
+# fetch them from the content service, so the executor would crash-on-compile
+# ("couldn't find library 'pathfinder.road'"). Install the vendored tars where
+# OpenTTD scans them.
+if ls "$REPO_DIR"/ottd_user/ai/library/*.tar >/dev/null 2>&1; then
+  mkdir -p "$OTTD_DIR/content_download/ai/library"
+  cp "$REPO_DIR"/ottd_user/ai/library/*.tar "$OTTD_DIR/content_download/ai/library/"
+  say "AI libraries installed (pathfinder.road + deps)."
+else
+  warn "no vendored AI libraries — executor may fail to compile. See TROUBLESHOOTING.md #9"
+fi
 # Generate the bridge GS (bare — no towns; use build_scenario.py for a
 # real-world map + towns).
 python3 - "$OTTD_DIR/game" "$REPO_DIR" <<'PY'
