@@ -18,7 +18,12 @@ const check = (name, cond, detail = "") => { if (cond) { pass++; console.log(`  
 
 const gw = spawn("node", ["server.mjs"], {
   cwd: new URL(".", import.meta.url).pathname,
-  env: { ...process.env, ARENA_MOCK: "1", PORT: String(PORT), KEYS_FILE: "/tmp/arena-e2e-keys.json", PAY_TO: "0x20Fb0619b6D23F8463d41C938Fc92115cC89406E" },
+  env: {
+    ...process.env, ARENA_MOCK: "1", PORT: String(PORT),
+    KEYS_FILE: "/tmp/arena-e2e-keys.json",
+    PAY_TO: "0x20Fb0619b6D23F8463d41C938Fc92115cC89406E",
+    HERO_PER_USD: "4370000", // static fallback so the test never hits the network
+  },
   stdio: ["ignore", "ignore", "inherit"],
 });
 const done = (code) => { try { gw.kill(); } catch {} process.exit(code); };
@@ -28,11 +33,12 @@ try {
   // 1. Quote
   const { status, body } = await getQuote(`${BASE}/v1/signup`);
   check("signup returns 402 quote", status === 402, `(${status})`);
-  check("quote lists USDG + HERO on RHC", (body.accepts || []).length === 2 && body.accepts.every((a) => a.network === "eip155:4663"));
+  const hero = (body.accepts || [])[0];
+  check("quote is HERO-only on RHC", (body.accepts || []).length === 1 && hero?.network === "eip155:4663" && hero?.extra?.assetTransferMethod === "permit2", `(${hero?.extra?.name})`);
+  check("HERO amount live-priced (>0)", BigInt(hero?.maxAmountRequired || "0") > 0n, `(${(Number(hero.maxAmountRequired) / 1e18).toLocaleString()} HERO)`);
 
-  // 2. Sign + mint (mock skips settlement, but we sign a real payload)
-  const usdg = body.accepts.find((a) => a.extra.assetTransferMethod === "eip3009");
-  const header = await payEip3009(acct, usdg);
+  // 2. Sign + mint via Permit2 (mock skips settlement, but we sign a real payload)
+  const header = await payPermit2(acct, hero);
   const minted = await payAndCall(`${BASE}/v1/signup`, header, {});
   check("signup mints a key", !!minted.body?.key, minted.body?.key ? `key=${minted.body.key.slice(0, 12)}…` : JSON.stringify(minted.body));
   const key = minted.body.key;

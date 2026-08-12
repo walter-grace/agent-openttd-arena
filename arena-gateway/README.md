@@ -6,19 +6,19 @@ The OpenTTD MCP server ([`agent/sandbox/x402_gate.py`](../agent/sandbox/x402_gat
 in gateway mode POSTs the bearer here; this gateway charges and returns
 `200`/`402`.
 
-## Why Robinhood Chain, and why $HERO
+## 100% $HERO
 
-No x402 facilitator covers Robinhood Chain (chain 4663), so this gateway
-**settles the payment itself** — the chain's own Permit2 / EIP-3009 contracts
-verify every signature. It accepts two assets:
+The arena runs on **one token: [$HERO](https://herorunai.com)**. Agents
+already pay Hero Run for their LLM inference in $HERO — so the same token they
+*earn and think with* is the token they *play with*. Earn $HERO, reason with
+$HERO, spend $HERO competing for routes. No stablecoin detour.
 
-- **USDG** (Global Dollar) — stable, gasless for the payer (EIP-3009).
-- **$HERO** (HERORUN) — via Permit2.
-
-The $HERO path is the interesting one: arena agents already pay
-[Hero Run](https://herorunai.com) for their LLM inference in $HERO. Accepting
-$HERO for gameplay means **one token funds both the agent's brain and its
-in-game economy** — earn $HERO, think with it, and spend it competing.
+$HERO (HERORUN) lives on Robinhood Chain (chain 4663). No x402 facilitator
+covers that chain, so this gateway **settles the payment itself** via the
+canonical Permit2 proxy — the chain's own contracts verify every signature.
+Signup amounts are **live-priced** from Hero Run's market feed
+(`herorunai.com/api/market`, 60s cache) so a fixed USD value always maps to
+the right amount of HERO, whatever the token is doing.
 
 ## Run it
 
@@ -43,7 +43,7 @@ Then point the MCP server at it:
 export X402_MODE=gateway
 export X402_GATEWAY_URL=http://localhost:8788
 export X402_CHAIN=robinhood-chain
-export X402_CURRENCY=USDG            # or HERO
+export X402_CURRENCY=HERO
 export X402_RECIPIENT_ADDRESS=0xYourWallet
 ```
 
@@ -51,7 +51,7 @@ export X402_RECIPIENT_ADDRESS=0xYourWallet
 
 | Method + path | Purpose |
 |---|---|
-| `POST /v1/signup` | x402: no `X-PAYMENT` → 402 quote (USDG + $HERO). With a signed `X-PAYMENT` → self-settle on RHC → mint `mcp_…` key + starter balance. |
+| `POST /v1/signup` | x402: no `X-PAYMENT` → 402 quote (live-priced $HERO). With a signed `X-PAYMENT` → self-settle the Permit2 signature on RHC → mint `mcp_…` key + starter balance. |
 | `POST /v1/<tool>` | Bearer key → debit the tool's price → `200` (with new balance) or `402` (insufficient). This is what the MCP gate calls. |
 | `GET /v1/balance` | Bearer key → remaining balance. |
 | `GET /v1/pricing` | Public price table. |
@@ -60,18 +60,19 @@ export X402_RECIPIENT_ADDRESS=0xYourWallet
 ## How an agent pays (client side)
 
 The signing helpers in [`lib/x402.mjs`](lib/x402.mjs) produce the `X-PAYMENT`
-header for both assets:
+header:
 
 ```js
 import { getQuote, payEip3009, payPermit2, payAndCall } from "./lib/x402.mjs";
 const { body } = await getQuote("http://gateway:8788/v1/signup");
-const usdg = body.accepts.find(a => a.extra.assetTransferMethod === "eip3009");
-const header = await payEip3009(account, usdg);          // gasless
+const hero = body.accepts[0];                             // HERO-only
+const header = await payPermit2(account, hero);           // Permit2 witness
 const { body: minted } = await payAndCall("http://gateway:8788/v1/signup", header, {});
 // minted.key → pass as `_payment_token` on every paid MCP tool call.
 ```
 
-For $HERO use `payPermit2` (needs a one-time `approve(Permit2)` on the token).
+Paying in $HERO needs a one-time `approve(Permit2, max)` on the HERO token
+from the payer wallet (plus a little gas ETH on Robinhood Chain).
 
 ## Prices
 

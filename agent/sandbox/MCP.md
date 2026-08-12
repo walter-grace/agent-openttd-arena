@@ -187,7 +187,7 @@ players require a bearer token from a payment gateway.
 Two gateways work out of the box:
 
 - **[`arena-gateway/`](../../arena-gateway/) — Robinhood Chain (recommended).**
-  Self-settled **USDG** (gasless) and **$HERO** on chain 4663. Because arena
+  **100% $HERO** on chain 4663, self-settled (live-priced from the Hero Run market). Because arena
   agents already pay [Hero Run](https://herorunai.com) for inference in $HERO,
   the same token funds both the agent's brain and its in-game economy. Ships
   in this repo; `node server.mjs`, no cloud account needed.
@@ -201,7 +201,7 @@ metadata and tool hints advertise the right chain and asset.
 **Default is OFF.** With no env vars set, every tool runs as before — the
 forker doesn't have to set up payments to try the kit.
 
-### Default prices (USDC per call)
+### Default prices (USD value per call)
 
 | Tool | Price | Reason |
 |---|---:|---|
@@ -227,7 +227,7 @@ Legacy alias: `X402_ENABLED=true` is equivalent to `X402_MODE=gateway`.
 
 ### Enabling real-money mode
 
-Robinhood Chain (bundled `arena-gateway/`, accepts USDG or $HERO):
+Robinhood Chain (bundled `arena-gateway/`, 100% $HERO):
 
 ```bash
 # start the gateway (see arena-gateway/README.md)
@@ -237,7 +237,7 @@ cd arena-gateway && SETTLER_PRIVATE_KEY=0x... PAY_TO=0xYourWallet node server.mj
 export X402_MODE=gateway
 export X402_GATEWAY_URL=http://localhost:8788
 export X402_CHAIN=robinhood-chain
-export X402_CURRENCY=USDG            # or HERO
+export X402_CURRENCY=HERO
 export X402_RECIPIENT_ADDRESS=0xYourWallet
 export X402_TIMEOUT_S=5              # optional
 ```
@@ -246,7 +246,7 @@ Or Base USDC (a create-mcpay Worker) — leave `X402_CHAIN`/`X402_CURRENCY`
 unset for the Base/USDC defaults and point `X402_GATEWAY_URL` at the Worker.
 
 Restart your MCP client (Claude Desktop / Cursor / Zed). On startup the server
-logs `x402: gateway mode (robinhood-chain/USDG, url=…, recipient=…)` to stderr.
+logs `x402: gateway mode (robinhood-chain/HERO, url=…, recipient=…)` to stderr.
 
 ### How clients pay
 

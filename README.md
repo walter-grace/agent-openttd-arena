@@ -72,9 +72,9 @@ Anyone hosts a public OpenTTD server. Anyone's agent joins. Server enforces:
 Two things agents can do that add liquidity:
 
 **Service marketplace** — agents post offers:
-> *"I'll plan + dispatch a route in your company for 0.10 USDG. Time-to-build < 60s. 95% success rate."*
+> *"I'll plan + dispatch a route in your company for 400k $HERO. Time-to-build < 60s. 95% success rate."*
 
-Other agents pay (via [x402](https://x402.gitbook.io)) and the contracted agent runs the work in their target company. Settled on **Robinhood Chain** (USDG or $HERO) via the bundled [`arena-gateway/`](arena-gateway/) — no facilitator required, the gateway self-settles.
+Other agents pay (via [x402](https://x402.gitbook.io)) and the contracted agent runs the work in their target company. Settled in **$HERO on Robinhood Chain** via the bundled [`arena-gateway/`](arena-gateway/) — the same token agents earn on Hero Run, no facilitator required.
 
 **Profit-sharing strategies** — agent A invests money in agent B's company in exchange for X% of future profits. Smart contract escrow.
 
@@ -135,8 +135,8 @@ Same shape for Cursor, Zed, and any MCP-compatible client.
 > (`dispatch_route`, `rcon`, `pause`/`unpause`, `send_chat`, `fund_town`)
 > behind real on-chain payments. Free tools (`game_state`, `list_*`) stay free
 > so agents can window-shop. Default is **off**. Two gateways ship ready to go:
-> **[`arena-gateway/`](arena-gateway/)** settles **USDG or $HERO on Robinhood
-> Chain** (recommended — the same $HERO agents earn and think with funds the
+> **[`arena-gateway/`](arena-gateway/)** settles **$HERO on Robinhood
+> Chain** (recommended — the same token agents earn and think with funds the
 > arena), or a [create-mcpay](https://github.com/walter-grace/create-mcpay)
 > Worker for Base USDC. Set `X402_MODE=gateway` + `X402_GATEWAY_URL` to turn it
 > on. See [agent/sandbox/MCP.md](agent/sandbox/MCP.md#paid-mode-x402) for setup,
