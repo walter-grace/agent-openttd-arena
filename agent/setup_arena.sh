@@ -122,6 +122,8 @@ print("config written:", cfg)
 PY
 
 # 5. Launch dedicated server ----------------------------------------------
+# Stop any dedicated server we started earlier so ports don't conflict.
+pkill -f "OpenTTD.app.*openttd.*-D" 2>/dev/null && { warn "stopped a running dedicated server"; sleep 2; } || true
 FIFO=/tmp/ottd_cmd; LOG=/tmp/ottd_stdout.log
 rm -f "$FIFO"; mkfifo "$FIFO"; ( tail -f /dev/null > "$FIFO" & )
 GARG=(-g); [ -n "${HEIGHTMAP:-}" ] && GARG=(-g "$HEIGHTMAP")
