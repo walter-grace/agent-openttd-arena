@@ -200,6 +200,25 @@ def test_price_override_via_env():
     print("PASS: price override JSON env var works")
 
 
+def test_chain_currency_config_for_robinhood():
+    # Default is Base/USDC for back-compat.
+    for k in ("X402_CHAIN", "X402_CURRENCY", "X402_MODE"):
+        os.environ.pop(k, None)
+    g = _reload_gate()
+    req = g._payment_required("dispatch_route", 0.05)
+    assert req["chain"] == "base" and req["currency"] == "USDC", req
+    # Configured for Robinhood Chain + USDG.
+    os.environ["X402_CHAIN"] = "robinhood-chain"
+    os.environ["X402_CURRENCY"] = "USDG"
+    g = _reload_gate()
+    req = g._payment_required("rcon", 0.10)
+    assert req["chain"] == "robinhood-chain" and req["currency"] == "USDG", req
+    assert "robinhood-chain" in g.status_summary()
+    os.environ.pop("X402_CHAIN", None)
+    os.environ.pop("X402_CURRENCY", None)
+    print("PASS: chain/currency configurable for Robinhood Chain (USDG/HERO)")
+
+
 # ---------------------------------------------------------------------------
 # mcp_server integration: tools/list shows price hints in gateway mode.
 # ---------------------------------------------------------------------------
@@ -281,6 +300,7 @@ def main() -> int:
         test_gateway_mode_missing_url,
         test_legacy_enabled_true_means_gateway,
         test_price_override_via_env,
+        test_chain_currency_config_for_robinhood,
         test_mcp_server_annotates_paid_tools_in_list,
         test_mcp_server_call_tool_blocks_paid_without_token,
         test_mcp_server_call_tool_strips_payment_token,

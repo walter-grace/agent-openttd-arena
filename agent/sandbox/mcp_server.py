@@ -625,18 +625,20 @@ def _annotated_tools() -> list[dict]:
         name = t["name"]
         if enabled and x402_gate.is_paid_tool(name):
             price = x402_gate.price_usdc(name)
+            cur = x402_gate._currency()
+            chain = x402_gate._chain()
             t["description"] = (
-                f"{t['description']} [x402: {price} USDC per call. Pass an "
-                f"`_payment_token` arg with a bearer token from the operator's "
-                f"create-mcpay gateway.]"
+                f"{t['description']} [x402: ~${price} in {cur} on {chain} per "
+                f"call. Pass an `_payment_token` arg with a bearer token from "
+                f"the operator's payment gateway.]"
             )
             schema = t["inputSchema"]
             schema.setdefault("properties", {})
             schema["properties"]["_payment_token"] = {
                 "type": "string",
                 "description": (
-                    f"x402 bearer token (mcp_...) — required, costs "
-                    f"{price} USDC."
+                    f"x402 bearer token (mcp_...) — required, ~${price} in "
+                    f"{cur} on {chain}."
                 ),
             }
         out.append(t)

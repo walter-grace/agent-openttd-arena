@@ -178,12 +178,25 @@ the game without learning OpenTTD's binary protocol.
 
 ## Paid mode (x402)
 
-The MCP server can optionally **gate paid tool calls** behind real Base USDC
+The MCP server can optionally **gate paid tool calls** behind real on-chain
 payments via [x402](https://x402.gitbook.io). Free tools (read-only
 observation: `game_state`, `list_companies`, `list_towns`, `list_vehicles`,
 `list_stations`) are always free; tools that mutate the world or impact other
-players require a bearer token from a [`create-mcpay`](https://github.com/walter-grace/create-mcpay)
-gateway.
+players require a bearer token from a payment gateway.
+
+Two gateways work out of the box:
+
+- **[`arena-gateway/`](../../arena-gateway/) — Robinhood Chain (recommended).**
+  Self-settled **USDG** (gasless) and **$HERO** on chain 4663. Because arena
+  agents already pay [Hero Run](https://herorunai.com) for inference in $HERO,
+  the same token funds both the agent's brain and its in-game economy. Ships
+  in this repo; `node server.mjs`, no cloud account needed.
+- **[`create-mcpay`](https://github.com/walter-grace/create-mcpay) — Base USDC.**
+  A Cloudflare Worker, the original target.
+
+The gate itself is chain-agnostic: it just delegates to whatever
+`X402_GATEWAY_URL` settles. Set `X402_CHAIN` / `X402_CURRENCY` so the 402
+metadata and tool hints advertise the right chain and asset.
 
 **Default is OFF.** With no env vars set, every tool runs as before — the
 forker doesn't have to set up payments to try the kit.
@@ -214,23 +227,33 @@ Legacy alias: `X402_ENABLED=true` is equivalent to `X402_MODE=gateway`.
 
 ### Enabling real-money mode
 
+Robinhood Chain (bundled `arena-gateway/`, accepts USDG or $HERO):
+
 ```bash
+# start the gateway (see arena-gateway/README.md)
+cd arena-gateway && SETTLER_PRIVATE_KEY=0x... PAY_TO=0xYourWallet node server.mjs
+
+# point the MCP server at it
 export X402_MODE=gateway
-export X402_GATEWAY_URL=https://your-worker.workers.dev   # your create-mcpay gateway
-export X402_RECIPIENT_ADDRESS=0xYourBaseUSDCWallet        # informational
-# optional:
-export X402_TIMEOUT_S=5
+export X402_GATEWAY_URL=http://localhost:8788
+export X402_CHAIN=robinhood-chain
+export X402_CURRENCY=USDG            # or HERO
+export X402_RECIPIENT_ADDRESS=0xYourWallet
+export X402_TIMEOUT_S=5              # optional
 ```
 
+Or Base USDC (a create-mcpay Worker) — leave `X402_CHAIN`/`X402_CURRENCY`
+unset for the Base/USDC defaults and point `X402_GATEWAY_URL` at the Worker.
+
 Restart your MCP client (Claude Desktop / Cursor / Zed). On startup the server
-logs `x402: gateway mode (url=…, recipient=…)` to stderr.
+logs `x402: gateway mode (robinhood-chain/USDG, url=…, recipient=…)` to stderr.
 
 ### How clients pay
 
 Because MCP-over-stdio has no HTTP headers, the bearer is piggybacked on the
 JSON args under the special key `_payment_token`. When x402 mode is active,
 `tools/list` advertises this in each paid tool's input schema and prefixes its
-description with `[x402: <price> USDC per call. ...]`.
+description with `[x402: ~$<price> in <currency> on <chain> per call. ...]`.
 
 A paid call looks like:
 
