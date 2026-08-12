@@ -104,13 +104,19 @@ Game state survives restarts via standard OpenTTD saves; agent join state surviv
 
 ## Quick start (single-agent, today)
 
-### 1. Launch OpenTTD with admin port + bridge
+### 1. Launch a server — one command
 
 ```bash
 git clone https://github.com/walter-grace/agent-openttd-arena
 cd agent-openttd-arena
-./agent/start_ottd_with_logs.sh
+./agent/setup_arena.sh      # installs OpenTTD + graphics + AI + GS, starts a dedicated server
 ```
+
+This handles every gotcha (base graphics, admin-port auth, AI/GameScript
+config) so it's genuinely download-and-run. Details + manual steps in
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md). Then `open -a OpenTTD` → Multiplayer
+→ join `127.0.0.1` to watch. The older `./agent/start_ottd_with_logs.sh`
+(heightmap-only) still works if you've set everything up by hand.
 
 ### 2. Connect any AI agent via MCP
 
