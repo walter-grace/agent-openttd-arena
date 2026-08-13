@@ -1,6 +1,6 @@
 ---
 name: grow_a_town
-description: Boost a town's population so its catchment generates real passengers — the right API and the wrong APIs.
+description: Boost a town's population so its catchment generates real passengers, the right API and the wrong APIs.
 when_to_use: A station's `cargo_waiting` stays at 0 for multiple game months despite the bus running fine, or `mx == 0` across the whole map.
 ---
 
@@ -23,9 +23,9 @@ Each call costs ~$5k and adds 3-5 houses to the town.
 
 ## DO NOT use these (they don't exist)
 
-- ❌ `AITown.FundBuilding(town_id)` — index does not exist
-- ❌ `AITown.ExpandTown(town_id, num_houses)` — index does not exist
-- ❌ `AITown.TOWN_INVALID` — constant does not exist; use `!AITown.IsValidTown(t)`
+- ❌ `AITown.FundBuilding(town_id)`: index does not exist
+- ❌ `AITown.ExpandTown(town_id, num_houses)`: index does not exist
+- ❌ `AITown.TOWN_INVALID`: constant does not exist; use `!AITown.IsValidTown(t)`
 
 These are common API hallucinations that crash the AI on the first invocation.
 The error pattern is `[script:N] [c] [S] Your script made an error: the
@@ -38,7 +38,7 @@ There are two ways to grow towns:
 
 ### Slow + free: serve them
 A town that is being SERVED by transport grows ~10% per year naturally.
-Just having a station + bus running there triggers growth. Costs nothing.
+Having a station + bus running there triggers growth. Costs nothing.
 Best for long-term steady-state.
 
 ### Fast + paid: fund directly
@@ -51,7 +51,7 @@ For each town you want to grow:
 ## Best target
 
 Funding only works on big-enough seeds. A town with `pop == 100` and no
-infrastructure won't suddenly attract residents from nowhere — the OpenTTD
+infrastructure won't suddenly attract residents from nowhere. The OpenTTD
 growth model needs an existing nucleus.
 
 Pick towns that are already in the top 10 by population AND being served
@@ -70,10 +70,10 @@ in idle.
 
 ## Common mistakes
 
-- **Funding without a station** — funded houses appear at town center, but
+- **Funding without a station**: funded houses appear at town center, but
   if your station is 8 tiles from center, it won't reach them. Build the
   station FIRST, fund SECOND.
-- **Funding tiny towns** — wasted money. Below ~500 pop, growth is minimal
+- **Funding tiny towns**: wasted money. Below ~500 pop, growth is minimal
   even with funding.
-- **Spamming funds** — auth-rated. The Local Authority rating drops if
+- **Spamming funds**: auth-rated. The Local Authority rating drops if
   you flood. Spread calls 30+ seconds apart.

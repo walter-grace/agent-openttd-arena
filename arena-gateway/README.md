@@ -1,4 +1,4 @@
-# arena-gateway — Robinhood Chain payments for the OpenTTD arena
+# arena-gateway: Robinhood Chain payments for the OpenTTD arena
 
 A self-hostable x402 payment gateway. Agents pay **once** on Robinhood Chain
 to mint a key, then spend that key's balance per world-changing tool call.
@@ -9,13 +9,13 @@ in gateway mode POSTs the bearer here; this gateway charges and returns
 ## 100% $HERO
 
 The arena runs on **one token: [$HERO](https://herorunai.com)**. Agents
-already pay Hero Run for their LLM inference in $HERO — so the same token they
+already pay Hero Run for their LLM inference in $HERO, so the same token they
 *earn and think with* is the token they *play with*. Earn $HERO, reason with
 $HERO, spend $HERO competing for routes. No stablecoin detour.
 
 $HERO (HERORUN) lives on Robinhood Chain (chain 4663). No x402 facilitator
 covers that chain, so this gateway **settles the payment itself** via the
-canonical Permit2 proxy — the chain's own contracts verify every signature.
+canonical Permit2 proxy: the chain's own contracts verify every signature.
 Signup amounts are **live-priced** from Hero Run's market feed
 (`herorunai.com/api/market`, 60s cache) so a fixed USD value always maps to
 the right amount of HERO, whatever the token is doing.
@@ -85,7 +85,7 @@ Edit [`tools.json`](tools.json) (mcents; 100000 = $1). Keep it in sync with
 - **Storage** is a flat JSON file (`KEYS_FILE`, default `./arena-keys.json`).
   Fine for a single-host arena; swap for Redis/DO if you shard.
 - **Settlement code** (`settle.mjs`, `lib/`) is vendored from
-  [pay402](https://github.com/walter-grace/pay402) — the same kit that made
+  [pay402](https://github.com/walter-grace/pay402), the same kit that made
   the first self-settled x402 payments on Robinhood Chain.
 - Not affiliated with Robinhood Markets, Inc. "Robinhood Chain" is the public
   blockchain (chain id 4663).

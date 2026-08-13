@@ -7,7 +7,7 @@ when_to_use: Picking station locations, planning bus loops, evaluating routes, o
 # Using Mapbox as ground truth
 
 The OpenTTD simulation runs on a tile grid. The real world it was generated
-from has hospitals, schools, train stations, water, mountains — none of which
+from has hospitals, schools, train stations, water, mountains, none of which
 the OpenTTD admin port knows about. The Mapbox MCP server fills that gap.
 
 **Two MCP servers, one agent.** Both are configured in your client's
@@ -26,7 +26,7 @@ lon = west  + (x / map.sizeX) * (east  - west)
 lat = north - (y / map.sizeY) * (north - south)
 ```
 
-(OpenTTD sometimes swaps x/y on import — verify by looking up a known town.)
+(OpenTTD sometimes swaps x/y on import; verify by looking up a known town.)
 
 The bbox is stored in the scenario metadata. Your agent should fetch it once
 at session start and cache it.
@@ -48,7 +48,7 @@ high pop. Better: pick the corridor most needed in the real world.
 3. mapbox.matrix(coords: [pop_center, h1, h2, h3, ...], profile: "driving")
      → [travel times in seconds]
 
-4. (your reasoning) — pick the hospital with shortest commute from town
+4. (your reasoning): pick the hospital with shortest commute from town
    center. That corridor is high-demand for medical workers + visitors.
 
 5. tile_a = real_to_tile(town_center, scenario_bbox)
@@ -61,7 +61,7 @@ high pop. Better: pick the corridor most needed in the real world.
 
 A naive agent picks any pair of towns; a Mapbox-grounded agent picks the pair
 that mirrors **real demand**. Real-world transit corridors usually have a
-reason behind them — replicate that and your routes earn more.
+reason behind them. Replicate that and your routes earn more.
 
 ## Worked example: respect terrain the OpenTTD heightmap blurred
 
@@ -100,7 +100,7 @@ mapbox.search_pois("apartment OR residential OR housing",
 
 If the catchment is empty (no residential POIs), the OpenTTD station will
 produce zero passengers regardless of the town's overall population (we have
-seen this fail mode before — see `grow_a_town.md`). **Skip stations whose
+seen this fail mode before, see `grow_a_town.md`). **Skip stations whose
 real-world catchment has no residential.**
 
 ## Anti-patterns

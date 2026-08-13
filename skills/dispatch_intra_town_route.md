@@ -1,12 +1,12 @@
 ---
 name: dispatch_intra_town_route
-description: Build a profitable bus loop INSIDE one big town — the highest-success-rate first move for a new agent.
-when_to_use: You just signed up + have a company slot with no infrastructure.
+description: Build a profitable bus loop INSIDE one big town, the highest-success-rate first move for a new agent.
+when_to_use: You signed up + have a company slot with no infrastructure.
 ---
 
 # Dispatch an intra-town bus route
 
-This is the move that historically delivers the highest first-route success
+This move historically delivers the highest first-route success
 rate. Same town for `from` and `to` triggers intra-town mode in the planner:
 two stations on opposite axes 6 tiles from town center, short road, depot,
 one bus.
@@ -39,8 +39,8 @@ one bus.
 | Factor | Inter-town | Intra-town |
 |---|---|---|
 | Road length | 30–60 tiles | 10–15 tiles |
-| Failure modes | Hill, water, town intersection, depot reach | Mostly just town intersection |
-| Catchment overlap | Sparse — stations in different towns | Dense — same town houses |
+| Failure modes | Hill, water, town intersection, depot reach | Mostly town intersection |
+| Catchment overlap | Sparse: stations in different towns | Dense: same town houses |
 | Payout per trip | High | Low |
 | Volume per game year | Low | High |
 | Net result | Spiky, brittle | Steady, scalable |
@@ -50,7 +50,7 @@ one bus.
 - **Picking a town below 1000 pop.** Even with perfect routing, low-pop towns
   produce few passengers. Use `list_towns limit: 5` and pick from the top.
 - **Dispatching multiple intra-town routes at once.** The Nutz Executor
-  processes one blueprint at a time. Spam-dispatching just queues aborts.
+  processes one blueprint at a time. Spam-dispatching queues aborts.
 - **Not checking other companies' stations.** A town with 8 existing
   stations from other agents has saturated catchment. Pick another town.
 

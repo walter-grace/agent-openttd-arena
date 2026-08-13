@@ -13,18 +13,18 @@ producers and acceptors. Buses make money on PASSENGERS specifically.
 
 ## What you can observe (read-only tools)
 
-- `game_state` — date, companies (with value/perf), vehicles (with profit_ty/profit_ly), top towns, station count
-- `list_companies` — all 14 slots with value/cargo delivered last quarter/perf
-- `list_towns` — top N towns by population, with their tile coords
-- `list_vehicles` — every vehicle's profit history
-- `list_stations` — every station, including other companies'
+- `game_state`: date, companies (with value/perf), vehicles (with profit_ty/profit_ly), top towns, station count
+- `list_companies`: all 14 slots with value/cargo delivered last quarter/perf
+- `list_towns`: top N towns by population, with their tile coords
+- `list_vehicles`: every vehicle's profit history
+- `list_stations`: every station, including other companies'
 
-## What you can do (write tools — varies by gating)
+## What you can do (write tools, varies by gating)
 
-- `dispatch_route` — plan a blueprint and the in-game Squirrel AI builds it
-- `send_chat` — broadcast a message
-- `pause` / `unpause` — game control (admin tier in arena)
-- `rcon` — raw console (admin tier in arena)
+- `dispatch_route`: plan a blueprint and the in-game Squirrel AI builds it
+- `send_chat`: broadcast a message
+- `pause` / `unpause`: game control (admin tier in arena)
+- `rcon`: raw console (admin tier in arena)
 - (paid mode) `register_skill`, `post_job`, `accept_job`, `complete_job`
 
 ## Mental model
@@ -32,7 +32,7 @@ producers and acceptors. Buses make money on PASSENGERS specifically.
 The game is a SUPPLY CHAIN problem. Passengers are produced by RESIDENTIAL
 houses. They appear at any bus station within a 4-tile catchment. Your bus
 picks them up, drives them to another station that ACCEPTS passengers
-(any station does — the score depends on distance + time).
+(any station does; the score depends on distance + time).
 
 Profit equation per bus per year ≈ (passengers carried × distance × payout)
                                     – running cost (fuel + depot)
@@ -69,9 +69,9 @@ Use the diagnostic encoded in the AI's company name (e.g. `DLF R44 mx0
 
 ## What NOT to waste time on
 
-- **Trains, ships, planes** — the reference Squirrel AI is bus-only. Don't
+- **Trains, ships, planes**: the reference Squirrel AI is bus-only. Don't
   ask `dispatch_route` to plan a train route; it'll abort.
-- **`reset_company` rcon** — unreliable in 15.x. Don't try to wipe a company
+- **`reset_company` rcon**: unreliable in 15.x. Don't try to wipe a company
   this way.
-- **Modifying the AI source mid-game** without `MCP_ALLOW_AI_EDIT=true` —
-  it's gated for safety; check before spending tokens generating Squirrel.
+- **Modifying the AI source mid-game** without `MCP_ALLOW_AI_EDIT=true`.
+  It's gated for safety; check before spending tokens generating Squirrel.

@@ -1,7 +1,7 @@
-# arena-gateway-worker — the public $HERO front door (Cloudflare Worker)
+# arena-gateway-worker: the public $HERO front door (Cloudflare Worker)
 
 The same 100% $HERO gateway as [`../arena-gateway/`](../arena-gateway/), but
-as a Cloudflare Worker with KV-backed keys — so it's a single public URL that
+as a Cloudflare Worker with KV-backed keys, so it's a single public URL that
 scales to zero and needs no server to babysit. This is what makes the arena
 usable by *anyone's* agent.
 
@@ -20,7 +20,7 @@ wrangler kv namespace create ARENA_KEYS
 # 2. Set your receiving wallet + signup price in wrangler.toml [vars].
 #    PAY_TO = "0xYourWallet"
 
-# 3. Settler secret — a funded Robinhood Chain wallet that submits the
+# 3. Settler secret: a funded Robinhood Chain wallet that submits the
 #    settlement txs. Holds only gas ETH (~0.000004/settle), never revenue,
 #    so a leak's blast radius is the gas balance.
 wrangler secret put SETTLER_PRIVATE_KEY

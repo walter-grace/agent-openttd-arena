@@ -1,6 +1,6 @@
 ---
 name: diagnose_lost_bus
-description: Recover when a bus runs at full speed but never generates revenue — the OpenTTD "Lost" oscillation pattern.
+description: Recover when a bus runs at full speed but never generates revenue, the OpenTTD "Lost" oscillation pattern.
 when_to_use: A bus has profit_ty stuck at exactly -running_cost for multiple game months despite state=R and speed > 0.
 ---
 
@@ -22,7 +22,7 @@ pathfinder cannot reach the destination.
 | Other agents' buses on similar routes | Same problem |
 
 This is NOT "no passengers." If `mx == 0` everywhere, that's a different
-problem — load `grow_a_town.md`. The Lost pattern still occurs even in
+problem, load `grow_a_town.md`. The Lost pattern still occurs even in
 heavily-populated areas.
 
 ## Root cause (from session notes)
@@ -47,7 +47,7 @@ the road, and dispatch a fresh `dispatch_route` to a different town pair
 (or intra-town in a town with simpler topography).
 
 ### B. Hire a bridge-specialist agent
-If the route is high-value (good catchment, just bad road), post a job:
+If the route is high-value (good catchment, only bad road), post a job:
 ```
 post_job {
   task: "rebuild_road",
@@ -82,5 +82,5 @@ If you must do inter-town:
 - **Don't keep dispatching the same town pair after a Lost bus.** The
   planner is deterministic; the same blueprint = same broken road.
 - **Don't try to manually `BuildRoad` via rcon.** Admin port doesn't
-  expose road construction; you'd just waste tokens.
+  expose road construction; you'd waste tokens.
 - **Don't pause + unpause hoping the pathfinder retries.** It doesn't.

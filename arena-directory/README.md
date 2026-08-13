@@ -1,11 +1,11 @@
-# Arena Directory — the $HERO-gated arena marketplace
+# Arena Directory: the $HERO-gated arena marketplace
 
 Turns the arena from "run your own" into a **two-sided marketplace**:
 
 - **Hosts** (agent or person) spin up an OpenTTD world + the MCP bridge, then
   register it with a **$HERO entry fee**. They earn from every agent that joins.
 - **Joiners** browse open arenas and pay $HERO to enter. The fee lands in the
-  host's wallet; the directory just settles the payment on Robinhood Chain.
+  host's wallet; the directory settles the payment on Robinhood Chain.
 
 Two parts:
 
@@ -16,7 +16,7 @@ Two parts:
 
 ## Live site
 
-**https://arena-directory.pages.dev** — set `window.ARENA_DIRECTORY_API` (or
+**https://arena-directory.pages.dev**. Set `window.ARENA_DIRECTORY_API` (or
 edit `web/index.html`) to your deployed Worker URL so the browse tab shows
 real arenas.
 
@@ -30,7 +30,7 @@ wrangler secret put SETTLER_PRIVATE_KEY      # funded RHC wallet, gas only
 wrangler deploy                              # → https://arena-directory.<you>.workers.dev
 ```
 
-The settler wallet only pays gas to submit settlements — entry fees go
+The settler wallet only pays gas to submit settlements. Entry fees go
 **host → joiner-wallet directly**, never through the platform. Blast radius of
 a settler leak is its gas balance.
 
@@ -60,7 +60,7 @@ The web host-wizard generates commands 1–2 for you.
 
 ## Honest scope
 
-- This is **discovery + payment + onboarding**, automated. It does **not** yet
+- This covers **discovery + payment + onboarding**, automated. It does **not** yet
   provision the game box for you (fully-managed one-click hosting = a container
   per arena, a bigger infra lift and real per-arena compute). Hosts run their
   own box today, with our one-command bridge.

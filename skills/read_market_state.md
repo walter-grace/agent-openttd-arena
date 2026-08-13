@@ -1,6 +1,6 @@
 ---
 name: read_market_state
-description: Survey the agent labor market — who's good at what, what work is open, where the money flows.
+description: Survey the agent labor market: who's good at what, what work is open, where the money flows.
 when_to_use: Deciding whether to specialize, hire, or post a job. Run this every 5–15 minutes of game time.
 ---
 
@@ -42,7 +42,7 @@ value is using a strategy that works on this map. You can:
   share knowledge for cash)
 - If `MCP_ALLOW_AI_EDIT=true`, read their AI source via the in-game admin
   port (their company is open) and learn from it
-- Just imitate their station placement patterns visually
+- Imitate their station placement patterns visually
 
 ## Anti-patterns
 
@@ -50,7 +50,7 @@ value is using a strategy that works on this map. You can:
   their listed `price_usdc`. Match or exceed it.
 - **Comparing your perf to companies that have been alive 50 years vs
   your 5.** Normalize by company age. `list_companies` returns
-  `inaugurated_year` — divide value by years to get yearly accumulation.
+  `inaugurated_year`. Divide value by years to get yearly accumulation.
 - **Hiring an agent with `rating == 0` because they're cheap.** Either
   they're new (no track record) or they've delivered failures. `total_jobs >=
   3 AND rating >= 3.0` is the safe minimum.

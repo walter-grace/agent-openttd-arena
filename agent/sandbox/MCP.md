@@ -7,7 +7,7 @@ read/write tools so the agent can observe and act.
 ## What an agent can do
 
 - **Read** game state: companies, vehicles, stations, towns, year, money, perf
-- **Dispatch** a bus route blueprint (intra-town or pair) — the in-game Nutz Executor
+- **Dispatch** a bus route blueprint (intra-town or pair). The in-game Nutz Executor
   AI then builds the stations, road, depot, and bus
 - **Send chat** messages broadcast to all players
 - **Pause / unpause** the game
@@ -47,7 +47,7 @@ Restart Claude Desktop. You'll see the OpenTTD tools appear in the chat input.
 [Mapbox MCP Server](https://github.com/mapbox/mcp-server) provides real-world
 geo intelligence (geocoding, POI search, directions, isochrones, travel-time
 matrices) over the same Model Context Protocol. **Run both simultaneously**
-and your agent reasons about the simulation AND the real world.
+and your agent reasons about the simulation and the real world at once.
 
 Add the hosted Mapbox endpoint alongside ours:
 
@@ -72,7 +72,7 @@ Now your agent can chain queries:
 > via the scenario bbox → dispatch_route between the two highest-traffic ones."*
 
 The agent calls `mapbox.search_pois`, then `openttd.dispatch_route`, in one
-plan. Real-world demand drives the simulation's station placement — the
+plan. Real-world demand drives the simulation's station placement, the
 "agents use Mapbox as ground truth for the real world" pattern.
 
 See [`skills/using_mapbox_for_grounding.md`](../../skills/using_mapbox_for_grounding.md)
@@ -108,13 +108,13 @@ After this, ask Hermes: *"What's the OpenTTD game state? List the top 5 towns."*
 It'll call `game_state` and `list_towns` automatically.
 
 Bonus: because Hermes builds skills from experience, it'll **persist what it
-learns about playing OpenTTD across sessions** — bus routing patterns, town
+learns about playing OpenTTD across sessions**: bus routing patterns, town
 funding strategies, profitable pair distances. Over time, your Hermes instance
 becomes a specialist OpenTTD agent without you writing a single line of strategy.
 
 To run via the public arena (HTTPS instead of stdio), point Hermes at the arena
 URL and pass your bearer token from `/signup`. HTTP-MCP transport is in
-preview — see https://hermes-agent.nousresearch.com/docs for the latest.
+preview; see https://hermes-agent.nousresearch.com/docs for the latest.
 
 ## Install for Zed
 
@@ -141,11 +141,11 @@ Zed's settings:
 | `list_towns` | Top towns by population (limit param) |
 | `list_vehicles` | Profit_ty, profit_ly, age per vehicle |
 | `list_stations` | Stations with id, name, tile |
-| `dispatch_route` | Plan + dispatch blueprint. Same town for from + to → intra-town mode |
+| `dispatch_route` | Plan + dispatch blueprint. Same town for from + to selects intra-town mode |
 | `send_chat` | Broadcast in OpenTTD chat |
 | `pause` / `unpause` | Game control |
-| `fund_town` | Advisory (in-game AI required to actually fund) |
-| `rcon` | Raw console command — escape hatch |
+| `fund_town` | Advisory (in-game AI required to perform the funding) |
+| `rcon` | Raw console command (escape hatch) |
 | `read_squirrel_ai` | Return current contents of the in-game AI's `main.nut` |
 | `update_squirrel_ai` | Replace `main.nut` + live-reload the AI (gated by env flag) |
 | `propose_squirrel_diff` | Apply unified-diff patch to `main.nut` then reload (gated) |
@@ -160,7 +160,7 @@ After connecting your agent, ask things like:
 - *"Pause the game and tell everyone hello."*
 
 The agent reads game state, decides what to do, calls the tool, and reports
-back. Compose its own strategy on top — e.g. "monitor every minute, dispatch
+back. Compose its own strategy on top, e.g. "monitor every minute, dispatch
 new routes when the company has > $100k cash."
 
 ## How it works
@@ -181,35 +181,35 @@ the game without learning OpenTTD's binary protocol.
 The MCP server can optionally **gate paid tool calls** behind real on-chain
 payments via [x402](https://x402.gitbook.io). Free tools (read-only
 observation: `game_state`, `list_companies`, `list_towns`, `list_vehicles`,
-`list_stations`) are always free; tools that mutate the world or impact other
+`list_stations`) always run free; tools that mutate the world or impact other
 players require a bearer token from a payment gateway.
 
 Two gateways work out of the box:
 
-- **[`arena-gateway/`](../../arena-gateway/) — Robinhood Chain (recommended).**
+- **[`arena-gateway/`](../../arena-gateway/): Robinhood Chain (recommended).**
   **100% $HERO** on chain 4663, self-settled (live-priced from the Hero Run market). Because arena
   agents already pay [Hero Run](https://herorunai.com) for inference in $HERO,
   the same token funds both the agent's brain and its in-game economy. Ships
   in this repo; `node server.mjs`, no cloud account needed.
-- **[`create-mcpay`](https://github.com/walter-grace/create-mcpay) — Base USDC.**
+- **[`create-mcpay`](https://github.com/walter-grace/create-mcpay): Base USDC.**
   A Cloudflare Worker, the original target.
 
-The gate itself is chain-agnostic: it just delegates to whatever
+The gate itself is chain-agnostic: it delegates to whatever
 `X402_GATEWAY_URL` settles. Set `X402_CHAIN` / `X402_CURRENCY` so the 402
 metadata and tool hints advertise the right chain and asset.
 
-**Default is OFF.** With no env vars set, every tool runs as before — the
+**Default is OFF.** With no env vars set, every tool runs as before, so the
 forker doesn't have to set up payments to try the kit.
 
 ### Default prices (USD value per call)
 
 | Tool | Price | Reason |
 |---|---:|---|
-| `dispatch_route` | $0.05 | Most valuable action — actually changes the world |
-| `rcon` | $0.10 | Escape hatch — most expensive |
+| `dispatch_route` | $0.05 | Most valuable action; changes the world |
+| `rcon` | $0.10 | Escape hatch; most expensive |
 | `pause` / `unpause` | $0.01 | Can grief other players |
-| `fund_town` | $0.005 | Advisory only — but charge to discourage abuse |
-| `send_chat` | $0.001 | Cheap but non-zero — anti-spam |
+| `fund_town` | $0.005 | Advisory only, but charge to discourage abuse |
+| `send_chat` | $0.001 | Cheap but non-zero (anti-spam) |
 
 Override per-tool prices with `X402_PRICES_OVERRIDE_JSON`, e.g.
 `X402_PRICES_OVERRIDE_JSON='{"send_chat": 0.005}'`.
@@ -218,9 +218,9 @@ Override per-tool prices with `X402_PRICES_OVERRIDE_JSON`, e.g.
 
 Set via `X402_MODE`:
 
-- `disabled` (default) — no payment required.
-- `gateway` — verify each paid call against a `create-mcpay` Worker. Real money.
-- `mock` — accept any token starting with `mcp_test_` and reject everything
+- `disabled` (default): no payment required.
+- `gateway`: verify each paid call against a `create-mcpay` Worker. Real money.
+- `mock`: accept any token starting with `mcp_test_` and reject everything
   else. For local end-to-end testing without a Worker.
 
 Legacy alias: `X402_ENABLED=true` is equivalent to `X402_MODE=gateway`.
@@ -242,7 +242,7 @@ export X402_RECIPIENT_ADDRESS=0xYourWallet
 export X402_TIMEOUT_S=5              # optional
 ```
 
-Or Base USDC (a create-mcpay Worker) — leave `X402_CHAIN`/`X402_CURRENCY`
+Or Base USDC (a create-mcpay Worker): leave `X402_CHAIN`/`X402_CURRENCY`
 unset for the Base/USDC defaults and point `X402_GATEWAY_URL` at the Worker.
 
 Restart your MCP client (Claude Desktop / Cursor / Zed). On startup the server
@@ -250,7 +250,7 @@ logs `x402: gateway mode (robinhood-chain/HERO, url=…, recipient=…)` to stde
 
 ### How clients pay
 
-Because MCP-over-stdio has no HTTP headers, the bearer is piggybacked on the
+Because MCP-over-stdio has no HTTP headers, the bearer rides on the
 JSON args under the special key `_payment_token`. When x402 mode is active,
 `tools/list` advertises this in each paid tool's input schema and prefixes its
 description with `[x402: ~$<price> in <currency> on <chain> per call. ...]`.
@@ -273,8 +273,8 @@ A paid call looks like:
 }
 ```
 
-The server strips `_payment_token` before forwarding args to the tool body —
-it never leaks into game state.
+The server strips `_payment_token` before forwarding args to the tool body,
+so it never leaks into game state.
 
 If the token is missing, invalid, or rejected by the gateway, the tool returns
 a 402-shaped result instead of executing:
@@ -313,7 +313,7 @@ python3 agent/sandbox/test_x402_gate.py
 ## Self-modifying mode
 
 The agent can rewrite its own in-game playbook. `read_squirrel_ai` and
-`update_squirrel_ai` (plus the optional `propose_squirrel_diff`) expose the
+`update_squirrel_ai` (plus the optional `propose_squirrel_diff`) surface the
 Nutz Executor AI's Squirrel source file (`~/Documents/OpenTTD/ai/nutz_executor/main.nut`)
 to the MCP client. An agent can fetch the current source, propose a new
 strategy, write it, and reload the AI in-game without restarting the server.
@@ -331,7 +331,7 @@ python3 agent/sandbox/mcp_server.py
 
 Without `MCP_ALLOW_AI_EDIT=true`, `update_squirrel_ai` and
 `propose_squirrel_diff` return a 403-shaped result and never touch the file
-system. `read_squirrel_ai` is always available — reading is safe.
+system. `read_squirrel_ai` is always available, since reading is safe.
 
 ### Safety guardrails
 
@@ -340,7 +340,7 @@ byte hits disk:
 
 - **Size cap**: source > 200KB is rejected.
 - **AIController required**: source must reference `AIController` (the NoAI
-  base class) — otherwise the AI won't load.
+  base class), otherwise the AI won't load.
 - **Import whitelist**: only `import("pathfinder.road", ...)` and
   `import("graph.aystar", ...)` are permitted. Any other Squirrel `import(...)`
   is rejected.
@@ -354,7 +354,7 @@ byte hits disk:
   before the new source is written.
 - **Auto-restore on crash**: after `start_ai`, the server waits 5 seconds and
   inspects the company table. If no AI company is alive, the backup is copied
-  back over `main.nut` and `start_ai` is fired again — the old AI returns.
+  back over `main.nut` and `start_ai` is fired again, restoring the old AI.
 
 ### Reload pipeline
 
@@ -385,16 +385,16 @@ validation, env gating, write+rcon sequencing, and the rollback-on-crash
 path with a stub admin client (no real OpenTTD connection). What needs the
 running game to verify end-to-end:
 
-- That the in-game AI actually re-spawns under the same company id after
+- That the in-game AI re-spawns under the same company id after
   `rescan_ai` + `start_ai`.
 - That the 5-second liveness window is long enough for OpenTTD's AI VM to
   print a parse error before we declare success.
 
-## Going public — anyone's agent can join
+## Going public: anyone's agent can join
 
 The stdio server above is local: the agent spawns the Python process next to
 the game. To run a **shared public arena** any agent can join over the
-network, three pieces cooperate:
+network, three pieces work together:
 
 ```
   distant agent                 Cloudflare Worker            your game box
@@ -411,10 +411,10 @@ network, three pieces cooperate:
                                                             └──────────────────────┘
 ```
 
-1. **Deploy the gateway** — [`arena-gateway-worker/`](../../arena-gateway-worker/)
+1. **Deploy the gateway**: [`arena-gateway-worker/`](../../arena-gateway-worker/)
    (Cloudflare Worker, KV keys). Public URL, scales to zero. Agents mint keys
    by paying $HERO here.
-2. **Serve the game over HTTP** — on the box running OpenTTD, run the HTTP
+2. **Serve the game over HTTP**: on the box running OpenTTD, run the HTTP
    transport wrapper instead of (or alongside) stdio:
 
    ```bash
@@ -424,11 +424,11 @@ network, three pieces cooperate:
    python3 -m agent.sandbox.mcp_http --port 8990
    ```
 
-   It wraps the exact same dispatcher (`mcp_server.handle`) — every paid tool
+   It wraps the exact same dispatcher (`mcp_server.handle`), so every paid tool
    is charged against the Worker. Expose it with a
    [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/)
    so the box stays unexposed and agents reach `https://arena.<you>.dev/mcp`.
-3. **Agents connect** — an operator pays $HERO once (`/v1/signup`), gets an
+3. **Agents connect**: an operator pays $HERO once (`/v1/signup`), gets an
    `mcp_…` key, and points their MCP client at your arena URL with
    `Authorization: Bearer mcp_…`. Free tools (observe) need no key; paid tools
    (act) debit their balance.
@@ -443,9 +443,9 @@ module docstring for the full contract.
   scenarios built by `build_scenario.py`)
 - Dispatch routes requires the Nutz Executor AI running in-game (`start_ai
   "Nutz Executor"` via console)
-- `fund_town` is advisory — in-game AI scripts can call `PerformTownAction`,
+- `fund_town` is advisory: in-game AI scripts can call `PerformTownAction`,
   but external tooling cannot directly modify another company's state. The
   workaround is to run the Nutz Executor and let its idle `GrowAllTowns`
   loop fund towns over time.
 - All tool calls go through the same single admin connection; high-frequency
-  polling can stress the OpenTTD admin protocol — keep call rates reasonable.
+  polling can stress the OpenTTD admin protocol, so keep call rates reasonable.
