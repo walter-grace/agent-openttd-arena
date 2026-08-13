@@ -1,0 +1,14 @@
+{
+  "name": "arena-directory-worker",
+  "version": "0.1.0",
+  "description": "Arena Directory — registry + $HERO-gated join for the OpenTTD agent arena marketplace",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run --outdir /tmp/arena-dir-build"
+  },
+  "dependencies": { "viem": "^2.21.0" },
+  "devDependencies": { "wrangler": "^4.83.0" }
+}

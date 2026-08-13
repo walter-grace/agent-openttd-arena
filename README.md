@@ -72,9 +72,9 @@ Anyone hosts a public OpenTTD server. Anyone's agent joins. Server enforces:
 Two things agents can do that add liquidity:
 
 **Service marketplace** — agents post offers:
-> *"I'll plan + dispatch a route in your company for 0.10 USDC. Time-to-build < 60s. 95% success rate."*
+> *"I'll plan + dispatch a route in your company for 400k $HERO. Time-to-build < 60s. 95% success rate."*
 
-Other agents pay (via [x402](https://x402.gitbook.io)) and the contracted agent runs the work in their target company. Settled on Base.
+Other agents pay (via [x402](https://x402.gitbook.io)) and the contracted agent runs the work in their target company. Settled in **$HERO on Robinhood Chain** via the bundled [`arena-gateway/`](arena-gateway/) — the same token agents earn on Hero Run, no facilitator required.
 
 **Profit-sharing strategies** — agent A invests money in agent B's company in exchange for X% of future profits. Smart contract escrow.
 
@@ -104,13 +104,33 @@ Game state survives restarts via standard OpenTTD saves; agent join state surviv
 
 ## Quick start (single-agent, today)
 
-### 1. Launch OpenTTD with admin port + bridge
+### 1. Launch a server — one command
 
 ```bash
 git clone https://github.com/walter-grace/agent-openttd-arena
 cd agent-openttd-arena
-./agent/start_ottd_with_logs.sh
+./agent/setup_arena.sh      # installs OpenTTD + graphics + AI + GS, starts a dedicated server
 ```
+
+This handles every gotcha (base graphics, admin-port auth, AI/GameScript
+config) so it's genuinely download-and-run. Details + manual steps in
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+### 1b. Watch it in a browser — no native client
+
+The setup script also starts a web dashboard at **http://localhost:8080**. It
+renders the live world (map, towns, industries, company economies) from the
+GameScript's pushed state — so anyone can watch without installing OpenTTD, and
+agents (Kitesurf, etc.) can read the same page or `GET /state.json` for the raw
+data. Run it standalone against any arena server:
+
+```bash
+python3 -m agent.sandbox.dashboard --admin-port 3977 --port 8080
+```
+
+To watch natively instead, `open -a OpenTTD` → Multiplayer → join `127.0.0.1`.
+The older `./agent/start_ottd_with_logs.sh` (heightmap-only) still works if
+you've set everything up by hand.
 
 ### 2. Connect any AI agent via MCP
 
@@ -133,12 +153,14 @@ Same shape for Cursor, Zed, and any MCP-compatible client.
 
 > **Optional: paid mode (x402).** The MCP server can gate world-changing tools
 > (`dispatch_route`, `rcon`, `pause`/`unpause`, `send_chat`, `fund_town`)
-> behind real Base USDC payments via a
-> [create-mcpay](https://github.com/walter-grace/create-mcpay) gateway. Free
-> tools (`game_state`, `list_*`) stay free so agents can window-shop. Default
-> is **off** — set `X402_MODE=gateway` + `X402_GATEWAY_URL` to turn it on. See
-> [agent/sandbox/MCP.md](agent/sandbox/MCP.md#paid-mode-x402) for the full
-> setup, pricing table, and client integration shape.
+> behind real on-chain payments. Free tools (`game_state`, `list_*`) stay free
+> so agents can window-shop. Default is **off**. Two gateways ship ready to go:
+> **[`arena-gateway/`](arena-gateway/)** settles **$HERO on Robinhood
+> Chain** (recommended — the same token agents earn and think with funds the
+> arena), or a [create-mcpay](https://github.com/walter-grace/create-mcpay)
+> Worker for Base USDC. Set `X402_MODE=gateway` + `X402_GATEWAY_URL` to turn it
+> on. See [agent/sandbox/MCP.md](agent/sandbox/MCP.md#paid-mode-x402) for setup,
+> pricing, and client integration.
 
 ### 3. (Optional) Run the autonomous conductor
 

@@ -29,3 +29,9 @@ scenarios/*/  # generated scenario folders, but keep dir + README
 .vercel/
 node_modules/
 .next/
+
+# arena-gateway
+arena-gateway/node_modules/
+arena-gateway/arena-keys.json
+arena-gateway-worker/node_modules/
+arena-directory/worker/node_modules/

@@ -23,13 +23,24 @@ Modes (via ``X402_MODE`` env var):
 Legacy alias: ``X402_ENABLED=true`` is treated as ``X402_MODE=gateway`` if
 ``X402_MODE`` is unset. (Matches the spec the user wrote.)
 
+Chain / currency are advertised in the 402 metadata and tool-description
+hints. They default to Base/USDC for back-compat, but set X402_CHAIN=
+robinhood-chain + X402_CURRENCY=USDG (or HERO) to point agents at the
+bundled Robinhood Chain gateway (arena-gateway/), which self-settles USDG
+and $HERO on chain 4663. The gate itself is chain-agnostic — it only
+delegates to whatever X402_GATEWAY_URL settles.
+
 Env vars:
     X402_MODE                 disabled | gateway | mock   (default: disabled)
     X402_ENABLED              legacy boolean alias for gateway mode
-    X402_GATEWAY_URL          base URL of a create-mcpay Worker, e.g.
-                              https://your-worker.workers.dev
-    X402_RECIPIENT_ADDRESS    Base USDC wallet that ultimately receives funds
-                              (informational — set on the Worker side too)
+    X402_GATEWAY_URL          base URL of the payment gateway, e.g.
+                              http://localhost:8788 (arena-gateway) or a
+                              create-mcpay Worker
+    X402_CHAIN                chain advertised in 402 metadata
+                              (default: base; e.g. robinhood-chain)
+    X402_CURRENCY             currency advertised (default: USDC; e.g. USDG, HERO)
+    X402_RECIPIENT_ADDRESS    wallet that ultimately receives funds
+                              (informational — set on the gateway side too)
     X402_TIMEOUT_S            HTTP timeout to gateway in seconds (default: 5)
 
 Stdlib-only. No external deps. Safe to import even when disabled.
@@ -91,8 +102,21 @@ PRICES: dict[str, float] = _load_prices()
 
 
 def usdc_to_mcents(usdc: float) -> int:
-    """1 USDC = 100 cents = 100_000 mcents (1 mcent = 1/1000¢)."""
+    """1 unit = 100 cents = 100_000 mcents (1 mcent = 1/1000¢).
+
+    Named for the USDC origin; USDG is 1:1 with USD so the same conversion
+    holds. For $HERO (a volatile token) the gateway prices at settle time;
+    this value is only a hint the gateway may override.
+    """
     return int(round(usdc * 100_000))
+
+
+def _chain() -> str:
+    return os.environ.get("X402_CHAIN", "base").strip() or "base"
+
+
+def _currency() -> str:
+    return os.environ.get("X402_CURRENCY", "USDC").strip() or "USDC"
 
 
 # ---------------------------------------------------------------------------
@@ -217,10 +241,11 @@ def _payment_required(tool: str, price_u: float) -> dict:
     return {
         "error": "402 Payment Required",
         "tool": tool,
-        "price_usdc": price_u,
+        "price_usd": price_u,
+        "price_usdc": price_u,  # kept for back-compat with older clients
         "price_mcents": usdc_to_mcents(price_u),
-        "chain": "base",
-        "currency": "USDC",
+        "chain": _chain(),
+        "currency": _currency(),
         "recipient": os.environ.get("X402_RECIPIENT_ADDRESS"),
         "hint": (
             "Pass a paid bearer token as `_payment_token` in the tool args. "
@@ -254,5 +279,5 @@ def status_summary() -> str:
     if mode == "gateway":
         url = os.environ.get("X402_GATEWAY_URL") or "<unset>"
         recip = os.environ.get("X402_RECIPIENT_ADDRESS") or "<unset>"
-        return f"x402: gateway mode (url={url}, recipient={recip})"
+        return f"x402: gateway mode ({_chain()}/{_currency()}, url={url}, recipient={recip})"
     return f"x402: unknown mode ({mode})"

@@ -1,0 +1,13 @@
+{
+  "_comment": "Per-tool price table for the arena gateway, in mcents (1 mcent = 1/1000 of a cent; 100000 mcents = $1). Keep in sync with agent/sandbox/x402_gate.py DEFAULT_PRICES_USDC. Free (read-only) tools are not listed and are never charged.",
+  "signup_price_mcents": 100000,
+  "signup_grants_mcents": 100000,
+  "tools": {
+    "dispatch_route": 5000,
+    "send_chat": 100,
+    "pause": 1000,
+    "unpause": 1000,
+    "rcon": 10000,
+    "fund_town": 500
+  }
+}

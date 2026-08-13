@@ -1,0 +1,14 @@
+name = "arena-directory"
+main = "src/index.mjs"
+compatibility_date = "2026-04-17"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+PLATFORM_NAME = "Arena Directory"
+HERO_PER_USD = "4370000"   # fallback if the live market feed is down
+
+# Registry storage. Create with:
+#   wrangler kv namespace create DIRECTORY
+[[kv_namespaces]]
+binding = "DIRECTORY"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
