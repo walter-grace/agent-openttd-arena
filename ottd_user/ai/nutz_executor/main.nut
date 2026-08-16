@@ -54,8 +54,13 @@ class NutzExecutorAI extends AIController {
     succeeded_jobs  = null;
     grow_cursor     = 0;
     last_err_short  = "";
+    /* Most recent Log() line. AILog goes nowhere on a macOS .app, so on
+     * abort this is the only description of what actually failed. */
+    last_log_msg    = "";
     /* Cached AICargo id of the passenger cargo. -1 until first lookup. */
     pax_cargo_id    = -1;
+    /* Cached bus-stop coverage radius. 0 until first lookup. */
+    pax_radius      = 0;
 
     function Start() {
         AILog.Info("Nutz Executor starting; idle until a NUTZ:bp blueprint arrives.");
@@ -83,6 +88,7 @@ class NutzExecutorAI extends AIController {
     }
 
     function Log(s) {
+        this.last_log_msg = s;
         if (s != this.last_log) { AILog.Info(s); this.last_log = s; }
     }
 
@@ -157,7 +163,7 @@ class NutzExecutorAI extends AIController {
         foreach (sid, _ in sl) {
             local txt = AISign.GetName(sid);
             if (!this.StartsWith(txt, "NUTZ:bp:")) continue;
-            local rest = txt.slice(7);  /* after "NUTZ:bp:" */
+            local rest = txt.slice(8);  /* after "NUTZ:bp:" (8 chars) */
             local parts = this.Split(rest, ':');
             if (parts.len() < 2) continue;
             local job = this.ToInt(parts[0]);
@@ -311,17 +317,38 @@ class NutzExecutorAI extends AIController {
         return -1;
     }
 
-    /* Score a candidate station tile by the passenger PRODUCTION of its
-     * 4-tile catchment. Production = how many passengers are generated
-     * by houses near the tile (vs acceptance = where passengers want to
-     * GO, e.g. offices). For a bus stop to actually pick up fares, we
-     * want high production - houses next to the stop. We also add
-     * acceptance/2 since stops are bidirectional. */
+    /* Passenger PRODUCTION alone - houses in the catchment. This is what
+     * decides whether a stop can ever pick anyone up, so it is kept
+     * separate from the blended ranking score. */
+    function ProdTilePax(tile) {
+        local pax = this.GetPaxCargoId();
+        if (pax == -1) return 0;
+        return AITile.GetCargoProduction(tile, pax, 1, 1, this.PaxRadius());
+    }
+
+    /* The catchment a bus stop actually covers. Scoring a wider radius than
+     * the stop will cover is how a tile whose houses all sit one ring too
+     * far out still scores well - the station gets built, covers nothing,
+     * and the town supplies 0 passengers to it. Ask the game rather than
+     * hardcoding, since the radius depends on the modified_catchment
+     * setting. */
+    function PaxRadius() {
+        if (this.pax_radius > 0) return this.pax_radius;
+        this.pax_radius = AIStation.GetCoverageRadius(AIStation.STATION_BUS_STOP);
+        if (this.pax_radius <= 0) this.pax_radius = 3;
+        return this.pax_radius;
+    }
+
+    /* Rank a candidate station tile: passenger production in the catchment
+     * the stop will actually cover, plus acceptance (where passengers want
+     * to GO) at half weight since stops are bidirectional. Ranking only -
+     * eligibility is decided by production alone, see TryBuildStation. */
     function ScoreTilePax(tile) {
         local pax = this.GetPaxCargoId();
         if (pax == -1) return 0;
-        local prod = AITile.GetCargoProduction(tile, pax, 1, 1, 4);
-        local acc  = AITile.GetCargoAcceptance(tile, pax, 1, 1, 4);
+        local r = this.PaxRadius();
+        local prod = AITile.GetCargoProduction(tile, pax, 1, 1, r);
+        local acc  = AITile.GetCargoAcceptance(tile, pax, 1, 1, r);
         return prod * 2 + acc;
     }
 
@@ -357,8 +384,9 @@ class NutzExecutorAI extends AIController {
             local front = AIMap.GetTileIndex(sx + fdx, sy + fdy);
             if (!AIMap.IsValidTile(tile) || !AIMap.IsValidTile(front)) continue;
             if (AITile.IsWaterTile(tile) || AITile.IsWaterTile(front)) continue;
+            local prod = this.ProdTilePax(tile);
             local score = this.ScoreTilePax(tile);
-            cands.append([score, tile, front, s]);
+            cands.append([score, tile, front, s, prod]);
         }
         /* Squirrel array sort with comparator: descending by score. */
         cands.sort(function(a, b) {
@@ -368,16 +396,25 @@ class NutzExecutorAI extends AIController {
         });
         /* Reject anything below MIN_PROD: a station with zero or near-zero
          * production will run a bus into the ground forever. Better to
-         * fail this town pair and let the conductor pick a different one. */
+         * fail this town pair and let the conductor pick a different one.
+         *
+         * Eligibility is decided by PRODUCTION ALONE. The blended score
+         * (prod*2 + acc) still ranks candidates, but gating on it let a
+         * tile with zero houses and high acceptance clear the bar - the
+         * station gets built, no passenger ever boards, and the bus runs
+         * at a loss until the company dies. Acceptance says where people
+         * want to GO; only production says anyone is there to pick up. */
         local MIN_PROD = 8;
-        local best_score = (cands.len() > 0) ? cands[0][0] : 0;
-        if (best_score < MIN_PROD) {
-            this.Log("stn " + label + " best score " + best_score + " < MIN_PROD " + MIN_PROD);
+        local best_prod = 0;
+        foreach (c in cands) if (c[4] > best_prod) best_prod = c[4];
+        if (best_prod * 2 < MIN_PROD) {
+            this.Log("stn " + label + " best production " + best_prod
+                     + " too low (need " + (MIN_PROD / 2) + ")");
             return null;
         }
         local last_err = "no candidates";
         foreach (c in cands) {
-            if (c[0] < MIN_PROD) break;  /* sorted desc, rest are worse */
+            if (c[4] * 2 < MIN_PROD) continue;  /* no houses in catchment */
             local tile = c[1]; local front = c[2]; local s = c[3];
             AITile.DemolishTile(tile);
             AITile.DemolishTile(front);
@@ -486,6 +523,10 @@ class NutzExecutorAI extends AIController {
             path = par;
         }
         this.Log("road built via pathfinder (" + segs + " segs)");
+        /* The pathfinder ran front-to-front; the stops themselves still
+         * need a bit pointing at them or no bus can pull in. */
+        this.ConnectStop(this.stn_a_tile, this.stn_a_front, "stn A");
+        this.ConnectStop(this.stn_b_tile, this.stn_b_front, "stn B");
         /* Verify the road we just built actually connects stn_a_front to
          * stn_b_front by running a fresh Pathfinder.Road that's effectively
          * forbidden from laying new road (huge no_existing_road penalty).
@@ -554,8 +595,24 @@ class NutzExecutorAI extends AIController {
         local fx = AIMap.GetTileX(this.depot_front);
         local fy = AIMap.GetTileY(this.depot_front);
         local fdx = fx - px; local fdy = fy - py;
-        local shifts = [[0,0],[1,0],[-1,0],[0,1],[0,-1],
-                        [1,1],[-1,-1],[1,-1],[-1,1]];
+        /* A 1-tile ring is not enough inside a real town: by the time we
+         * get here the planner's depot tile and all eight neighbours are
+         * usually taken by the stations and the road we just laid, and
+         * every candidate comes back ERR_AREA_NOT_CLEAR. Search a 2-tile
+         * ring instead, nearest-first, and skip tiles that are still not
+         * buildable after the demolish attempt - demolish silently fails
+         * on our own road, on stations, and on protected town property. */
+        local shifts = [];
+        for (local dx = -2; dx <= 2; dx++) {
+            for (local dy = -2; dy <= 2; dy++) shifts.append([dx, dy]);
+        }
+        shifts.sort(function(a, b) {
+            local da = (a[0] < 0 ? -a[0] : a[0]) + (a[1] < 0 ? -a[1] : a[1]);
+            local db = (b[0] < 0 ? -b[0] : b[0]) + (b[1] < 0 ? -b[1] : b[1]);
+            if (da < db) return -1;
+            if (da > db) return 1;
+            return 0;
+        });
         local last_err = "no candidates";
         foreach (s in shifts) {
             local sx = px + s[0]; local sy = py + s[1];
@@ -563,12 +620,15 @@ class NutzExecutorAI extends AIController {
             local front = AIMap.GetTileIndex(sx + fdx, sy + fdy);
             if (!AIMap.IsValidTile(tile) || !AIMap.IsValidTile(front)) continue;
             if (AITile.IsWaterTile(tile) || AITile.IsWaterTile(front)) continue;
+            if (AIRoad.IsRoadStationTile(tile) || AIRoad.IsRoadDepotTile(tile)) continue;
             AITile.DemolishTile(tile);
             AITile.DemolishTile(front);
+            if (!AITile.IsBuildable(tile)) { last_err = "tile not clear"; continue; }
             if (AIRoad.BuildRoadDepot(tile, front)) {
                 this.depot_tile = tile;
                 this.depot_front = front;
                 this.built_depot = true;
+                this.ConnectStop(tile, front, "depot");
                 if (s[0] != 0 || s[1] != 0) {
                     this.Log("depot built (shift " + s[0] + "," + s[1] + ")");
                 } else {
@@ -633,7 +693,7 @@ class NutzExecutorAI extends AIController {
             }
             last_err = AIError.GetLastErrorString();
         }
-        this.Log("depot fail (9 attempts): " + last_err);
+        this.Log("depot fail (all ring tiles): " + last_err);
         this.phase = "abort";
     }
 
@@ -671,9 +731,12 @@ class NutzExecutorAI extends AIController {
         AIOrder.AppendOrder(v, this.stn_a_tile, AIOrder.OF_NON_STOP_INTERMEDIATE);
         AIOrder.AppendOrder(v, this.stn_b_tile, AIOrder.OF_NON_STOP_INTERMEDIATE);
         AIVehicle.StartStopVehicle(v);
-        /* Fleet scaling: clones share orders. Keep at 1 while we debug the
-         * road-connectivity loop; bump back to 3 once routes verify clean. */
-        local FLEET_SIZE = 1;
+        /* Fleet scaling: clones share orders. Held at 1 while the
+         * road-connectivity loop was under debug; that is fixed now (stops
+         * are explicitly connected to their front tile), and one bus cannot
+         * clear the queue a healthy stop builds up - 500+ passengers pile
+         * on while it drives. Back to 3. */
+        local FLEET_SIZE = 3;
         for (local i = 1; i < FLEET_SIZE; i++) {
             local cv = AIVehicle.CloneVehicle(this.depot_tile, v, true);
             if (!AIVehicle.IsValidVehicle(cv)) {
@@ -740,7 +803,14 @@ class NutzExecutorAI extends AIController {
                 if (w > maxW) maxW = w;
             }
         }
-        local nm = "Nutz " + stChar + sp + " mx" + maxW + " " + lx + "," + ly;
+        /* wA/wB are the whole point of this diagnostic - they say whether
+         * passengers are queueing at OUR two stops, which distinguishes
+         * "route works, bus is slow" from "nobody is there to pick up".
+         * They were computed and then dropped from the string. */
+        local nm = "N" + stChar + sp + " a" + wA + " b" + wB
+                   + " p" + this.ProdTilePax(this.stn_a_tile)
+                   + " r" + this.PaxRadius()
+                   + " o" + AIOrder.GetOrderCount(this.built_vehicle);
         if (nm.len() > 31) nm = nm.slice(0, 31);
         AICompany.SetName(nm);
     }
@@ -761,7 +831,16 @@ class NutzExecutorAI extends AIController {
             local saved_routes = this.routes_built;
             this.ResetState();
             this.routes_built = saved_routes;
-            this.LoadBlueprint();  /* re-load after reset */
+            /* ResetState() wiped the tiles the first LoadBlueprint() just
+             * set, so this reload is what actually arms the build. If it
+             * comes back false we would march into PhaseStations with
+             * job_id -1 and tile -1 and fail ERR_PRECONDITION_FAILED on
+             * every candidate, so stay idle instead. */
+            if (!this.LoadBlueprint()) {
+                this.Log("reload after reset found no blueprint - staying idle");
+                this.phase = "done";
+                return;
+            }
             this.Log("next blueprint job=" + this.job_id);
             this.phase = "stations";
         }
@@ -784,8 +863,23 @@ class NutzExecutorAI extends AIController {
     }
 
     function PhaseAbort() {
+        /* Surface WHY, not just THAT. AILog goes nowhere on a macOS .app,
+         * so the company name is the one channel the admin port can read.
+         * Snapshot the reason BEFORE logging the abort itself, or the abort
+         * line overwrites the failure it is reporting. */
+        local why = this.last_log_msg != "" ? this.last_log_msg
+                                            : this.last_err_short;
+        /* The company name caps at 31 chars and the useful part of a log
+         * line is its tail ("depot fail (all ring tiles): ERR_..."), so keep
+         * what follows the last ": " rather than the leading prose. */
+        local cut = -1;
+        for (local i = 0; i < why.len(); i++) if (why[i] == ':') cut = i;
+        if (cut >= 0 && cut + 2 <= why.len()) why = why.slice(cut + 1);
+        while (why.len() > 0 && why[0] == ' ') why = why.slice(1);
         this.Log("ABORT job=" + this.job_id + " - rolling back");
-        this.SetPhase("ABRT");
+        local nm = why == "" ? "ABRT" : "A:" + why;
+        if (nm.len() > 31) nm = nm.slice(0, 31);
+        AICompany.SetName(nm);
         /* Blacklist this job_id so LoadBlueprint skips it next tick. The
          * GS-placed NUTZ:bp:<job>:* signs are not ours to remove, but we
          * still need to stop trying. */
@@ -821,6 +915,36 @@ class NutzExecutorAI extends AIController {
             if (AISign.GetName(sid) != null) AISign.RemoveSign(sid);
         }
         this.owned_signs = [];
+    }
+
+    /* Connect a bay stop (or depot) to its front tile.
+     *
+     * BuildRoadStation/BuildRoadDepot give the STOP tile a road bit facing
+     * its front, but the front tile only gets a matching bit back if it
+     * already had road at that moment. We build stations first and lay the
+     * road afterwards, so the pathfinder writes the front tile's bits along
+     * its own path and none of them point at the stop. Two adjacent road
+     * tiles whose bits do not face each other are not connected: YAPF can
+     * never enter, the bus circles forever at full speed ("Lost"), the
+     * station stays empty, and the town supplies 0 passengers.
+     *
+     * Cheap to call when it is already connected - that is just a no-op. */
+    function ConnectStop(stop_tile, front_tile, label) {
+        if (stop_tile == -1 || front_tile == -1) return false;
+        if (AIRoad.AreRoadTilesConnected(front_tile, stop_tile)) return true;
+        local ok = AIRoad.BuildRoad(front_tile, stop_tile);
+        if (!ok && AIError.GetLastError() == AIError.ERR_ALREADY_BUILT) ok = true;
+        if (!ok) {
+            ok = AIRoad.BuildRoad(stop_tile, front_tile);
+            if (!ok && AIError.GetLastError() == AIError.ERR_ALREADY_BUILT) ok = true;
+        }
+        if (ok) {
+            this.built_road.append([front_tile, stop_tile]);
+            this.Log("connected " + label + " to its front");
+        } else {
+            this.Log("connect " + label + " fail: " + AIError.GetLastErrorString());
+        }
+        return ok;
     }
 
     /* Walk from tile a to tile b one step at a time, building road on

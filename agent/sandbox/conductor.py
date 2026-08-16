@@ -195,7 +195,10 @@ def main() -> int:
                 time.sleep(args.interval)
                 continue
             a, b = pair
-        job_counter += 1
+        # Blueprint.validate() caps job_id at 999 (the sign-name encoding),
+        # so a long run would raise instead of dispatching. Wrap into 1..999;
+        # by the time it wraps, the earlier job of that id is long finished.
+        job_counter = job_counter % 999 + 1
         a_name = a.get("name", ""); b_name = b.get("name", "")
         key = tuple(sorted([a_name, b_name]))
         dispatched.add(key)

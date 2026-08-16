@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
@@ -175,6 +176,18 @@ def _safe_town_name(name: str) -> str:
     return name.strip()
 
 
+def _parse_population(raw) -> int:
+    """OSM population tags are free text: "45827", "45,827", "45 827",
+    "~45000", "45827 (2020)". A bare int() on those raises, and treating the
+    failure as population 0 silently drops the town. Strip thousands
+    separators, then take the first run of digits."""
+    if raw is None:
+        return 0
+    cleaned = re.sub(r"[,\s'\.]", "", str(raw))
+    m = re.search(r"\d+", cleaned)
+    return int(m.group(0)) if m else 0
+
+
 def _parse_overpass(data: dict, min_pop: int) -> List[Town]:
     out: List[Town] = []
     for el in data.get("elements", []):
@@ -185,16 +198,11 @@ def _parse_overpass(data: dict, min_pop: int) -> List[Town]:
         if not name:
             continue
         place = tags.get("place", "")
-        try:
-            pop = int(tags.get("population") or 0)
-        except (TypeError, ValueError):
-            pop = 0
+        pop = _parse_population(tags.get("population"))
+        # Cities pass regardless of population: the tag is often missing or
+        # unparseable on exactly the places we most want on the map.
         if pop < min_pop and place != "city":
-            # Cities without a population tag still pass.
-            if pop == 0 and place == "city":
-                pass
-            else:
-                continue
+            continue
         out.append(Town(
             name=name,
             lat=float(el["lat"]),

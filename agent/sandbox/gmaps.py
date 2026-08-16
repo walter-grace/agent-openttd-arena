@@ -31,7 +31,11 @@ except ImportError:
     httpx = None  # type: ignore
 
 
-_AT_RE = re.compile(r"@(-?\d+\.\d+),(-?\d+\.\d+),(\d+(?:\.\d+)?)z")
+# lat/lon may be integers ("@34,-112,9z"), and the third field is either
+# a zoom ("9z"/"6.49z") or a camera altitude in metres ("15000m"), which
+# is what Maps writes for satellite/3D views. Both are common in shared
+# links, so both have to parse.
+_AT_RE = re.compile(r"@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?),(\d+(?:\.\d+)?)([zm])")
 _DEST_RE = re.compile(r"!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)")
 _SHORT_HOSTS = ("maps.app.goo.gl", "goo.gl/maps")
 
@@ -56,15 +60,28 @@ def resolve_short(url: str, timeout_s: float = 10.0) -> str:
         return str(r.url)
 
 
+def _zoom_from_altitude_m(altitude_m: float) -> float:
+    """Maps' satellite/3D links carry a camera altitude instead of a zoom
+    ("@34.7,-112.8,15000m"). Google's own viewer treats ~35200m as z11 and
+    halves the altitude per zoom step, so invert that relation and clamp to
+    the zoom range bbox_from_center accepts."""
+    if altitude_m <= 0:
+        return 12.0
+    zoom = 11.0 + math.log2(35200.0 / altitude_m)
+    return max(1.0, min(22.0, zoom))
+
+
 def parse_center(url: str) -> Optional[Center]:
     """Extract (lat, lon, zoom) from a Google Maps URL. Returns None if
     we can't find anything usable. Caller decides whether to call
     `resolve_short` first."""
     m = _AT_RE.search(url)
     if m:
+        value = float(m.group(3))
+        zoom = value if m.group(4) == "z" else _zoom_from_altitude_m(value)
         return Center(lat=float(m.group(1)),
                       lon=float(m.group(2)),
-                      zoom=float(m.group(3)))
+                      zoom=zoom)
     m = _DEST_RE.search(url)
     if m:
         return Center(lat=float(m.group(1)),

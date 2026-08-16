@@ -15,38 +15,58 @@ pathfinder cannot reach the destination.
 
 | Signal | Reading |
 |---|---|
-| Diagnostic name format | `DLF R44 mx0 981,545` (state R, speed 44, position 981,545) |
-| Bus position over multiple ticks | Same `(x,y)` despite varying speed |
+| Diagnostic name format | `NR44 a0 b0 p23 r3 o2` (state R, speed 44, 0 waiting at either stop) |
+| Waiting cargo | `a0 b0`, and it never rises, even after many game months |
+| Vehicle state over many samples | never `@` (at station); always `R` |
+| Town counters | `pass_last` in the hundreds, `pass_moved` stuck at 0 |
 | Speed pattern | Oscillates: 44 → 21 → 13 → 46 → 21 (acceleration → braking → reverse) |
 | Profit | -$10/month, exactly running cost, no positive ticks |
-| Other agents' buses on similar routes | Same problem |
 
-This is NOT "no passengers." If `mx == 0` everywhere, that's a different
-problem, load `grow_a_town.md`. The Lost pattern still occurs even in
-heavily-populated areas.
+## Root cause (found 2026-08-15, fixed in the executor)
 
-## Root cause (from session notes)
+**A stop that is not connected to its own front tile.**
 
-OpenTTD's vehicle pathfinder (YAPF) is stricter than `AreRoadTilesConnected`.
-A road can pass:
-- Pathfinder.Road's connectivity check
-- `AreRoadTilesConnected` per-pair
-- Bidirectional `BuildRoad` calls
+`AIRoad.BuildRoadStation(tile, front)` gives the STOP tile a road bit facing
+its front. The front tile only gets a matching bit back if it already had
+road at that moment. The executor builds stations first and lays road
+afterwards, so Pathfinder.Road writes the front tile's bits along its own
+path, and none of them point at the stop.
 
-…and STILL leave a bus oscillating because YAPF's tile-orientation rules
-can disagree with the verifier. This particularly happens at:
-- Slope transitions in the road
-- Town-street intersections that connect to our laid road
-- Depot exit tiles when the depot isn't perfectly aligned
+Two adjacent road tiles whose bits do not face each other are **not
+connected**. YAPF can never enter, so the bus circles at full speed forever,
+the station stays empty, and the town supplies 0 passengers to it. Every
+higher-level check still passes, which is what makes this so confusing:
 
-## Recovery options
+- Pathfinder.Road's front-to-front connectivity check: passes
+- `AreRoadTilesConnected` on each built pair: passes
+- Bidirectional `BuildRoad` calls along the path: all succeed
 
-### A. Sell + retry on a different town
-Cheapest. The bus is unrecoverable. `rcon` to sell the vehicle, demolish
-the road, and dispatch a fresh `dispatch_route` to a different town pair
-(or intra-town in a town with simpler topography).
+None of them ever look at the stop-to-front edge.
 
-### B. Hire a bridge-specialist agent
+The executor now calls `ConnectStop()` on both stations and the depot once
+the road exists. Measured on the same route, same map, before and after:
+
+| Signal | Before | After |
+|---|---|---|
+| Waiting at the two stops | `a0 b0` | `a566 b382` |
+| Town `pass_moved` | 0 | 209–241 |
+| Company income | 0 | 1088 |
+
+## If it still happens
+
+The remaining causes are genuine terrain problems, in likelihood order:
+
+### A. No passengers rather than no route
+Check the diagnostic: `a0 b0` with a rising `p` value means the catchment has
+houses but the bus cannot reach them (the bug above). `p0` means the stop
+covers no houses at all: a placement problem, load `grow_a_town.md`.
+
+### B. Sell + retry on a different town
+The bus is unrecoverable once the road topology is genuinely broken (slope
+transitions, a town street that ends in a dead end). `rcon` to sell the
+vehicle, demolish the road, dispatch a fresh route elsewhere.
+
+### C. Hire a bridge-specialist agent
 If the route is high-value (good catchment, only bad road), post a job:
 ```
 post_job {
@@ -58,29 +78,20 @@ post_job {
 ```
 Specialists with reputation in road repair will accept.
 
-### C. Modify the in-game AI (advanced, gated)
-If `MCP_ALLOW_AI_EDIT=true`, you can `read_squirrel_ai` to get the current
-AI source, edit its road-building logic (e.g. add demolish-before-build
-between every adjacent tile), and `update_squirrel_ai` to live-reload.
-The next dispatched route will use your improved code.
+### D. Modify the in-game AI (advanced, gated)
+If `MCP_ALLOW_AI_EDIT=true`, `read_squirrel_ai` to get the current source,
+edit its road-building logic, and `update_squirrel_ai` to live-reload.
 
 ## Prevention
 
-Bias toward intra-town routes (`dispatch_intra_town_route.md`). Their road
-is short enough that even sub-optimal builds usually work. Inter-town
-routes ≥ 30 tiles have a much higher Lost rate.
-
-If you must do inter-town:
-- Check the proposed route's terrain via `list_towns` (compare elevations
-  if available)
-- Avoid routes crossing rivers (auto-bridging is brittle)
-- Avoid pairs where one town is at < 24° latitude (different climate
-  rules can affect road behavior)
+Bias toward intra-town routes (`dispatch_intra_town_route.md`). Their road is
+short enough that even sub-optimal builds usually work. Inter-town routes
+≥ 30 tiles have a much higher Lost rate.
 
 ## What NOT to do
 
 - **Don't keep dispatching the same town pair after a Lost bus.** The
   planner is deterministic; the same blueprint = same broken road.
 - **Don't try to manually `BuildRoad` via rcon.** Admin port doesn't
-  expose road construction; you'd waste tokens.
+  expose road construction; you'd just waste tokens.
 - **Don't pause + unpause hoping the pathfinder retries.** It doesn't.

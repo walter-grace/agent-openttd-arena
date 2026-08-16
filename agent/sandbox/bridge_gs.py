@@ -277,9 +277,14 @@ class {class_main} extends GSController {{
                 local obj = ap.GetObject();
                 if (obj != null && obj.rawin("cmd")) {{
                     this.ProcessAdminCmd(obj);
+                }} else {{
+                    GSAdmin.Send({{ kind = "err", cmd = "admin_port",
+                                    reason = "object has no cmd key",
+                                    got = (obj == null ? "null" : typeof obj) }});
                 }}
             }}
-            GSAdmin.Send({{ kind = "event", type = t }});
+            GSAdmin.Send({{ kind = "event", type = t,
+                            admin_t = GSEvent.ET_ADMIN_PORT }});
         }}
     }}
 
@@ -296,7 +301,7 @@ class {class_main} extends GSController {{
             local sl = GSSignList();
             foreach (s, _ in sl) {{
                 local n = GSSign.GetName(s);
-                if (n != null && n.len() >= 4 && n.slice(0,4) == "NUTZ:") {{
+                if (n != null && n.len() >= 5 && n.slice(0,5) == "NUTZ:") {{
                     GSSign.RemoveSign(s);
                 }}
             }}

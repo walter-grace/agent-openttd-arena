@@ -52,6 +52,10 @@ except ImportError as e:
 
 TILE_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 TILE_PX = 256
+# Politeness cap on a single scenario's tile fetches. A 16x16 grid at
+# 256px/tile is already 4096px of source detail — past that we are
+# hammering a free endpoint for pixels the resize throws away.
+MAX_TILES = 256
 LEGAL_DIMS = (64, 128, 256, 512, 1024, 2048, 4096)
 
 
@@ -69,9 +73,24 @@ def lat_lon_to_tile_xy(lat: float, lon: float, zoom: int) -> Tuple[float, float]
     return x, y
 
 
+def grid_dims(bbox: Tuple[float, float, float, float], zoom: int) -> Tuple[int, int]:
+    """(cols, rows) of slippy tiles needed to cover bbox at `zoom`."""
+    s, w, n, e = bbox
+    x_a, y_a = lat_lon_to_tile_xy(n, w, zoom)   # NW
+    x_b, y_b = lat_lon_to_tile_xy(s, e, zoom)   # SE
+    cols = int(math.floor(x_b)) - int(math.floor(x_a)) + 1
+    rows = int(math.floor(y_b)) - int(math.floor(y_a)) + 1
+    return cols, rows
+
+
 def choose_zoom(bbox: Tuple[float, float, float, float], output_px: int) -> int:
     """Pick a zoom that yields ~2x the output resolution before resize.
-    Wider bboxes need lower zoom; small city bboxes need higher."""
+    Wider bboxes need lower zoom; small city bboxes need higher.
+
+    The detail target is then clamped down until the tile grid fits inside
+    MAX_TILES, so continent-scale bboxes (a whole US state, the Alps) degrade
+    to coarser source data instead of failing outright. The resize to
+    `output_px` hides most of the difference anyway."""
     s, w, n, e = bbox
     # Use the wider dimension; slightly favors longitude since high-latitude
     # pixels have less ground per pixel due to mercator stretch.
@@ -80,7 +99,13 @@ def choose_zoom(bbox: Tuple[float, float, float, float], output_px: int) -> int:
         return 12
     target_tiles = (output_px * 2) / TILE_PX
     z_float = math.log2(target_tiles * 360.0 / span_deg)
-    return max(2, min(13, int(round(z_float))))
+    zoom = max(2, min(13, int(round(z_float))))
+    while zoom > 2:
+        cols, rows = grid_dims(bbox, zoom)
+        if cols * rows <= MAX_TILES:
+            break
+        zoom -= 1
+    return zoom
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +134,7 @@ def _fetch_grid(bbox: Tuple[float, float, float, float], zoom: int,
     y_max = int(math.floor(y_b))
     cols = x_max - x_min + 1
     rows = y_max - y_min + 1
-    if cols * rows > 256:
+    if cols * rows > MAX_TILES:
         raise RuntimeError(
             f"too many tiles ({cols}x{rows}={cols*rows}) for zoom {zoom}; "
             "bbox too wide for that detail level - lower zoom or smaller bbox"

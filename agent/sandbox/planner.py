@@ -85,7 +85,13 @@ def _plan_intra_town(a: _Town, map_w: int, map_h: int,
     grows in a + or X pattern instead of stacking.
     """
     ax, ay = _tiles_to_xy(a.tile, map_w)
-    OFFSET = 6
+    # 6 tiles from the town centre lands both stops outside the built-up
+    # core on real-world heightmaps, where towns are compact - the route
+    # builds fine and then carries nobody (town produces ~1000 pax/month,
+    # supplies 0). Same lesson the inter-town path already learned when
+    # EDGE_OFFSET went 5 -> 2. 4 keeps the two stops far enough apart to
+    # earn distance-based fares while staying inside the houses.
+    OFFSET = 4
     # Rotate orientation by job_id mod 4 so repeated dispatches per town
     # spread stations into a cluster.
     axes = [(1, 0), (0, 1), (1, 1), (1, -1)]
@@ -98,10 +104,20 @@ def _plan_intra_town(a: _Town, map_w: int, map_h: int,
         return None, "intra-town stations collapsed (town at edge)"
     stn_a = _xy_to_tile(sx_a, sy_a, map_w)
     stn_b = _xy_to_tile(sx_b, sy_b, map_w)
-    # Front tile is one step from station toward partner. Direction is
-    # the axis flipped (since station_b is opposite station_a).
-    fx_a, fy_a = sx_a - dx, sy_a - dy
-    fx_b, fy_b = sx_b + dx, sy_b + dy
+    # Front tile is one step from station toward partner, along the
+    # DOMINANT axis only. The diagonal orientations (1,1)/(1,-1) must not
+    # be applied here: AIRoad.BuildRoadStation requires the front to be
+    # orthogonally adjacent to the station tile, and a diagonal front makes
+    # every candidate fail ERR_PRECONDITION_FAILED - which silently killed
+    # every job whose job_id % 4 was 2 or 3.
+    seg_dx = sx_b - sx_a
+    seg_dy = sy_b - sy_a
+    if abs(seg_dx) >= abs(seg_dy):
+        step_x, step_y = (1 if seg_dx > 0 else -1), 0
+    else:
+        step_x, step_y = 0, (1 if seg_dy > 0 else -1)
+    fx_a, fy_a = sx_a + step_x, sy_a + step_y
+    fx_b, fy_b = sx_b - step_x, sy_b - step_y
     front_a = _xy_to_tile(fx_a, fy_a, map_w)
     front_b = _xy_to_tile(fx_b, fy_b, map_w)
     # Walk x first, then y, in unit steps (manhattan L).
