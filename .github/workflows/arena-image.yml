@@ -1,0 +1,124 @@
+name: arena image
+
+# Builds the arena-in-a-box image, proves it actually boots a playable world,
+# and publishes it so self-hosters can `docker run` instead of cloning and
+# building. The build runs here rather than on a laptop: GitHub's runners are
+# native amd64 (the image has no arm64 variant) and the layers never touch a
+# developer's disk.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docker/**'
+      - 'agent/**'
+      - 'ottd_user/**'
+      - '.github/workflows/arena-image.yml'
+  pull_request:
+    paths:
+      - 'docker/**'
+      - 'agent/**'
+      - 'ottd_user/**'
+      - '.github/workflows/arena-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Load into the local daemon first: nothing gets published until the
+      # smoke test says the image boots a real arena.
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: arena:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Boot the arena
+        run: |
+          docker run -d --name arena \
+            -p 3979:3979 -p 8080:8080 -p 8990:8990 \
+            arena:ci
+          sleep 5
+          docker ps --filter name=arena --format '{{.Names}} {{.Status}}'
+
+      # The real assertion. Admin port 3977 is container-internal by design,
+      # so this runs inside.
+      - name: Verify the world is playable
+        run: docker exec arena python3 /app/docker/smoke.py
+
+      - name: Verify the game port accepts joins
+        run: |
+          python3 - <<'PY'
+          import socket, sys
+          try:
+              socket.create_connection(("127.0.0.1", 3979), 10).close()
+          except OSError as e:
+              sys.exit(f"FAIL: game port 3979 refused a connection: {e}")
+          print("ok: game port 3979 accepts connections")
+          PY
+
+      - name: Verify the dashboard and MCP bridge answer
+        run: |
+          for probe in "dashboard 8080" "mcp 8990"; do
+            set -- $probe
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+                     "http://127.0.0.1:$2/" || echo 000)
+            # Any HTTP response proves the listener is up; MCP legitimately
+            # rejects a bare GET, so only a dead socket (000) is a failure.
+            if [ "$code" = "000" ]; then
+              echo "FAIL: $1 on :$2 did not respond"; exit 1
+            fi
+            echo "ok: $1 on :$2 responded (HTTP $code)"
+          done
+
+      # Whatever broke, the container log is the first thing anyone wants.
+      - name: Arena logs
+        if: always()
+        run: |
+          echo "===== container log ====="
+          docker logs arena 2>&1 | tail -60
+          echo "===== openttd log ====="
+          docker exec arena sh -c 'tail -40 /tmp/ottd.log' 2>/dev/null || true
+
+      - name: Stop the arena
+        if: always()
+        run: docker rm -f arena || true
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Cache-hit rebuild of the exact layers just verified, then publish.
+      - name: Publish
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
