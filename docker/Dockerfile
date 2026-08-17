@@ -14,7 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl xz-utils unzip python3 \
       liblzo2-2 libicu72 fontconfig libpng16-16 zlib1g libsdl2-2.0-0 \
-      libgomp1 libglib2.0-0 \
+      libgomp1 libglib2.0-0 libfluidsynth3 \
     && rm -rf /var/lib/apt/lists/*
 
 # OpenTTD (pinned generic linux release).
