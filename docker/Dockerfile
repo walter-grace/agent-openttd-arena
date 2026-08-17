@@ -6,6 +6,8 @@ FROM --platform=linux/amd64 debian:bookworm-slim
 
 ARG OTTD_VER=15.3
 ARG OPENGFX_VER=7.1
+ARG OPENSFX_VER=1.0.3
+ARG OPENMSX_VER=0.4.2
 ENV DEBIAN_FRONTEND=noninteractive \
     OTTD_DIR=/arena \
     ADMIN_PW=nutzarena
@@ -42,6 +44,20 @@ RUN missing="$(ldd /usr/local/bin/openttd | grep 'not found' || true)"; \
     fi; \
     openttd --help >/dev/null 2>&1 || true; \
     echo "all shared libraries resolve"
+
+# Base sets. A dedicated server refuses to start without a sounds set even
+# though it never plays one ("Failed to find a sounds set"), and it cannot
+# fetch these itself with no content-download UI. Music is included so the
+# same image works for a desktop client pointed at this data dir.
+RUN set -eux; \
+    mkdir -p "${OTTD_DIR}/baseset"; \
+    for pair in "opensfx:${OPENSFX_VER}" "openmsx:${OPENMSX_VER}"; do \
+      name="${pair%%:*}"; ver="${pair##*:}"; \
+      curl -fsSL "https://cdn.openttd.org/${name}-releases/${ver}/${name}-${ver}-all.zip" -o /tmp/s.zip; \
+      unzip -oq /tmp/s.zip -d /tmp/s; \
+      tar -xf /tmp/s/${name}-*.tar -C "${OTTD_DIR}/baseset/"; \
+      rm -rf /tmp/s /tmp/s.zip; \
+    done
 
 # Base graphics (headless server can't fetch them on its own).
 RUN mkdir -p "${OTTD_DIR}/baseset" \
