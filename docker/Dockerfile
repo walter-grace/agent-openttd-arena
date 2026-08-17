@@ -21,8 +21,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl -fsSL "https://cdn.openttd.org/openttd-releases/${OTTD_VER}/openttd-${OTTD_VER}-linux-generic-amd64.tar.xz" \
       -o /tmp/ottd.tar.xz \
     && tar -xJf /tmp/ottd.tar.xz -C /opt \
-    && ln -s "/opt/openttd-${OTTD_VER}-linux-generic-amd64/openttd" /usr/local/bin/openttd \
-    && rm /tmp/ottd.tar.xz
+    # Install the WHOLE tarball into the standard data dir, not just the
+    # binary. lang/ ships beside the executable, and symlinking the binary
+    # alone leaves OpenTTD unable to find it: it exits with "No available
+    # language packs" before the admin port ever opens.
+    && mkdir -p /usr/share/games/openttd \
+    && cp -R "/opt/openttd-${OTTD_VER}-linux-generic-amd64/." /usr/share/games/openttd/ \
+    && ln -sf /usr/share/games/openttd/openttd /usr/local/bin/openttd \
+    && rm -rf /tmp/ottd.tar.xz "/opt/openttd-${OTTD_VER}-linux-generic-amd64"
 
 # Prove every shared library the binary needs is actually present. Without
 # this the first symptom of a missing dep is a container that boots, prints
@@ -52,6 +58,7 @@ COPY docker/entrypoint.sh /app/entrypoint.sh
 COPY docker/smoke.py /app/docker/smoke.py
 RUN chmod +x /app/entrypoint.sh \
     && mkdir -p "${OTTD_DIR}/ai" "${OTTD_DIR}/game" "${OTTD_DIR}/content_download/ai/library" \
+    && ln -sfn /usr/share/games/openttd/lang "${OTTD_DIR}/lang" \
     && cp -R /app/ottd_user/ai/nutz_executor "${OTTD_DIR}/ai/" \
     && cp /app/ottd_user/ai/library/*.tar "${OTTD_DIR}/content_download/ai/library/" \
     # generate the bridge GameScript at build time (bare, no towns)
