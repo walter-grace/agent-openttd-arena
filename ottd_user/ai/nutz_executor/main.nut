@@ -384,6 +384,9 @@ class NutzExecutorAI extends AIController {
             local front = AIMap.GetTileIndex(sx + fdx, sy + fdy);
             if (!AIMap.IsValidTile(tile) || !AIMap.IsValidTile(front)) continue;
             if (AITile.IsWaterTile(tile) || AITile.IsWaterTile(front)) continue;
+            /* Stop B's search ring can reach stop A on a short route, and
+             * both candidate tiles are demolished before the build. */
+            if (this.IsOurStop(tile) || this.IsOurStop(front)) continue;
             local prod = this.ProdTilePax(tile);
             local score = this.ScoreTilePax(tile);
             cands.append([score, tile, front, s, prod]);
@@ -620,7 +623,12 @@ class NutzExecutorAI extends AIController {
             local front = AIMap.GetTileIndex(sx + fdx, sy + fdy);
             if (!AIMap.IsValidTile(tile) || !AIMap.IsValidTile(front)) continue;
             if (AITile.IsWaterTile(tile) || AITile.IsWaterTile(front)) continue;
-            if (AIRoad.IsRoadStationTile(tile) || AIRoad.IsRoadDepotTile(tile)) continue;
+            /* Both tiles get demolished below, so BOTH have to be cleared of
+             * our own infrastructure first. Guarding only `tile` let the
+             * depot hunt bulldoze a station we had just built via its
+             * `front`, leaving a one-station route whose two orders point at
+             * the same stop: the buses shuttle nowhere and earn nothing. */
+            if (this.IsOurStop(tile) || this.IsOurStop(front)) continue;
             AITile.DemolishTile(tile);
             AITile.DemolishTile(front);
             if (!AITile.IsBuildable(tile)) { last_err = "tile not clear"; continue; }
@@ -929,6 +937,16 @@ class NutzExecutorAI extends AIController {
      * station stays empty, and the town supplies 0 passengers.
      *
      * Cheap to call when it is already connected - that is just a no-op. */
+    /* True if the tile carries a road stop or depot, or is one of the two
+     * station tiles of the route we are mid-way through building. Anything
+     * that answers yes must never be demolished to make room. */
+    function IsOurStop(tile) {
+        if (tile == -1) return false;
+        if (tile == this.stn_a_tile || tile == this.stn_b_tile) return true;
+        if (tile == this.depot_tile && this.built_depot) return true;
+        return AIRoad.IsRoadStationTile(tile) || AIRoad.IsRoadDepotTile(tile);
+    }
+
     function ConnectStop(stop_tile, front_tile, label) {
         if (stop_tile == -1 || front_tile == -1) return false;
         if (AIRoad.AreRoadTilesConnected(front_tile, stop_tile)) return true;
