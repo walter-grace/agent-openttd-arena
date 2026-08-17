@@ -14,7 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl xz-utils unzip python3 \
       liblzo2-2 libicu72 fontconfig libpng16-16 zlib1g libsdl2-2.0-0 \
-      libgomp1 \
+      libgomp1 libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # OpenTTD (pinned generic linux release).
@@ -23,6 +23,19 @@ RUN curl -fsSL "https://cdn.openttd.org/openttd-releases/${OTTD_VER}/openttd-${O
     && tar -xJf /tmp/ottd.tar.xz -C /opt \
     && ln -s "/opt/openttd-${OTTD_VER}-linux-generic-amd64/openttd" /usr/local/bin/openttd \
     && rm /tmp/ottd.tar.xz
+
+# Prove every shared library the binary needs is actually present. Without
+# this the first symptom of a missing dep is a container that boots, prints
+# "Starting OpenTTD...", and serves a port nobody can reach - and each missing
+# library only reveals itself one run at a time. ldd lists them all at once,
+# at build time, where it is cheap to fix.
+RUN missing="$(ldd /usr/local/bin/openttd | grep 'not found' || true)"; \
+    if [ -n "$missing" ]; then \
+      echo "FATAL: openttd is missing shared libraries:"; echo "$missing"; \
+      exit 1; \
+    fi; \
+    openttd --help >/dev/null 2>&1 || true; \
+    echo "all shared libraries resolve"
 
 # Base graphics (headless server can't fetch them on its own).
 RUN mkdir -p "${OTTD_DIR}/baseset" \
