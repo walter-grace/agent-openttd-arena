@@ -62,10 +62,21 @@ openttd -D -g -c "$CFG" > "$LOG" 2>&1 &
 OTTD_PID=$!
 
 # wait for the admin port
+ADMIN_UP=0
 for i in $(seq 1 30); do
-  if python3 -c "import socket;socket.create_connection(('127.0.0.1',$ADMIN_PORT),2).close()" 2>/dev/null; then break; fi
+  if python3 -c "import socket;socket.create_connection(('127.0.0.1',$ADMIN_PORT),2).close()" 2>/dev/null; then ADMIN_UP=1; break; fi
   sleep 1
 done
+
+# If the server never came up, die here. Carrying on leaves a container that
+# `docker ps` reports as healthy while nothing is listening - which is how a
+# missing shared library stayed invisible: the entrypoint printed "Starting
+# OpenTTD..." and openttd had already exited.
+if [ "$ADMIN_UP" != "1" ]; then
+  echo "FATAL: OpenTTD never opened admin port $ADMIN_PORT. Server log:" >&2
+  tail -40 "$LOG" >&2 || true
+  exit 1
+fi
 
 # 3. Start the Nutz Executor AI over the admin port (slot alone won't spawn it).
 say "Starting the Nutz Executor AI…"

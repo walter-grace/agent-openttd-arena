@@ -14,6 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates curl xz-utils unzip python3 \
       liblzo2-2 libicu72 fontconfig libpng16-16 zlib1g libsdl2-2.0-0 \
+      libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # OpenTTD (pinned generic linux release).
@@ -35,6 +36,7 @@ WORKDIR /app
 COPY agent /app/agent
 COPY ottd_user /app/ottd_user
 COPY docker/entrypoint.sh /app/entrypoint.sh
+COPY docker/smoke.py /app/docker/smoke.py
 RUN chmod +x /app/entrypoint.sh \
     && mkdir -p "${OTTD_DIR}/ai" "${OTTD_DIR}/game" "${OTTD_DIR}/content_download/ai/library" \
     && cp -R /app/ottd_user/ai/nutz_executor "${OTTD_DIR}/ai/" \
