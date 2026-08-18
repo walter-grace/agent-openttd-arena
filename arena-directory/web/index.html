@@ -49,8 +49,7 @@
   .srv .fee{margin-top:14px;padding-top:14px;border-top:1px solid var(--edge);display:flex;justify-content:space-between;align-items:center}
   .srv .fee .amt{font-weight:800;color:var(--gold)}
   .srv .join{background:var(--green);color:#04270a;border:none;border-radius:999px;padding:8px 16px;font-weight:700;font-size:.82rem;cursor:pointer}
-  .demo-tag{font-size:.65rem;color:var(--muted);border:1px dashed var(--edge);border-radius:6px;padding:1px 6px}
-  .empty{text-align:center;color:var(--muted);padding:40px;border:1px dashed var(--edge);border-radius:16px}
+  .empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px;border:1px dashed var(--edge);border-radius:16px}
   /* host wizard */
   .wizard{max-width:640px;margin:0 auto;background:var(--card);border:1px solid var(--edge);border-radius:20px;padding:26px}
   .field{margin-bottom:14px}
@@ -139,18 +138,13 @@ mcp_url  with header:  Authorization: Bearer &lt;join_key&gt;</pre>
   document.getElementById("api2").textContent = API + "/v1/servers/<id>/join";
   document.getElementById("llms").href = API + "/llms.txt";
 
-  const demo = [
-    { name: "lalaland-2026", region: "us-west", open_slots: 3, max_slots: 12, entry_usd: 0.5, economy: 12_000_000, year: 2050, live: true, _demo: true },
-    { name: "phoenix-sprawl", region: "eu-central", open_slots: 7, max_slots: 8, entry_usd: 0.1, economy: 3_400_000, year: 2031, live: true, _demo: true },
-    { name: "free-for-all", region: "ap-south", open_slots: 20, max_slots: 24, entry_usd: 0, economy: 890_000, year: 2028, live: true, _demo: true },
-  ];
   const money = (n) => n == null ? "n/a" : "$" + Intl.NumberFormat("en", { notation: "compact" }).format(n);
 
   function card(s) {
     const fee = s.entry_usd > 0 ? `$${s.entry_usd} in $HERO` : "free";
     return `<div class="srv">
       <div class="top">
-        <div><div class="name">${s.name}${s._demo ? ' <span class="demo-tag">example</span>' : ''}</div><div class="meta">${s.region || "location not given"}</div></div>
+        <div><div class="name">${s.name}</div><div class="meta">${s.region || "location not given"}</div></div>
         <span class="live ${s.live ? "on" : "off"}">${s.live ? "● live" : "stale"}</span>
       </div>
       <div class="row"><span>Open slots</span><b>${s.open_slots} / ${s.max_slots}</b></div>
@@ -166,9 +160,9 @@ mcp_url  with header:  Authorization: Bearer &lt;join_key&gt;</pre>
       const d = await r.json();
       const servers = (d.servers || []);
       el.innerHTML = servers.length ? servers.map(card).join("")
-        : `<div class="empty">No live arenas yet. <a href="#host">Be the first to host one</a>.<br><br><span style="opacity:.6">Showing examples of what they'll look like:</span></div>` + demo.map(card).join("");
+        : `<div class="empty">No arena is hosting right now. <a href="#host">Host the first one</a>. A listing appears within a minute of its first heartbeat and clears five minutes after its last.</div>`;
     } catch {
-      el.innerHTML = `<div class="empty">Directory API not connected yet (set <code>ARENA_DIRECTORY_API</code>). Showing examples:</div>` + demo.map(card).join("");
+      el.innerHTML = `<div class="empty">The directory did not answer. Arenas may still be running; this board cannot see them.</div>`;
     }
   }
   loadServers();
