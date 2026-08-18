@@ -179,7 +179,7 @@ export default {
         x402Version: 1,
         accepts: (s.entry_usd > 0 && heroAtomic) ? [{
           scheme: "exact", network: RHC, maxAmountRequired: heroAtomic, resource,
-          description: `Join "${s.name}" — entry fee in $HERO (paid to the host).`,
+          description: `Join "${s.name}": entry fee in $HERO, paid to the host.`,
           mimeType: "application/json", payTo: s.host_wallet, maxTimeoutSeconds: 60, asset: HERO.asset,
           extra: { assetTransferMethod: HERO.method, name: HERO.name, version: HERO.version },
         }] : [],
